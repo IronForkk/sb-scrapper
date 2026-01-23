@@ -1,0 +1,10 @@
+seleniumbase
+requests
+psycopg2-binary
+pydantic
+fastapi
+uvicorn
+pydantic-settings
+loguru
+python-dotenv
+pandas

@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  sb-scraper:
+    build: .
+    init: true
+    container_name: sb-scraper
+    ports:
+      - "${PORT:-8000}:8000"
+    environment:
+      - HEADLESS=${HEADLESS:-true}
+      - WAIT_TIME=${WAIT_TIME:-8}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - BLACKLIST_FILE=${BLACKLIST_FILE:-black-list.lst}
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
