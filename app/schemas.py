@@ -161,7 +161,7 @@ class ScrapeResponse(BaseModel):
     """
     
     # ==================== DURUM ====================
-    status: Literal["success", "error", "blacklisted"] = Field(
+    status: Literal["success", "error", "blacklisted", "processing"] = Field(
         ...,
         title="İşlem Durumu",
         description="""
@@ -170,8 +170,9 @@ class ScrapeResponse(BaseModel):
         - `success`: İşlem başarıyla tamamlandı
         - `error`: İşlem sırasında hata oluştu
         - `blacklisted`: Domain black-list'te bulundu
+        - `processing`: İşlem devam ediyor (geçici durum)
         """,
-        examples=["success", "error", "blacklisted"]
+        examples=["success", "error", "blacklisted", "processing"]
     )
     
     # ==================== EKRAN GÖRÜNTÜLERİ (Base64) ====================
