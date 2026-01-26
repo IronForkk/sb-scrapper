@@ -8,3 +8,4 @@ pydantic-settings
 loguru
 python-dotenv
 pandas
+gunicorn

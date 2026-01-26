@@ -91,4 +91,5 @@ ENV WAIT_TIME=8
 ENV LOG_LEVEL=INFO
 
 # Konteyner başladığında API'yi çalıştır
-CMD ["python3", "-m", "app.main"]
+# CMD ["python3", "-m", "app.main"]
+CMD ["gunicorn", "app.main:app", "-w", "1", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000", "--max-requests", "1000", "--max-requests-jitter", "50", "--timeout", "300"]
