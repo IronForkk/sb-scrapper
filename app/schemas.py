@@ -4,6 +4,7 @@ Request ve Response şemaları
 """
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Literal
+from urllib.parse import urlparse
 
 
 class ScrapeRequest(BaseModel):
@@ -91,9 +92,17 @@ class ScrapeRequest(BaseModel):
     )
     
     get_ddg_html: bool = Field(
-        True, 
+        True,
         title="DuckDuckGo HTML Al",
         description="DuckDuckGo arama sonucunun HTML'ini alır",
+        examples=[True, False]
+    )
+    
+    # ==================== NETWORK TRAFİĞİ ====================
+    capture_network_logs: bool = Field(
+        False,
+        title="Ağ Trafiğini Yakala",
+        description="XHR, Fetch ve Media (video/audio) ağ trafiğini yakalar. Varsayılan olarak kapalıdır.",
         examples=[True, False]
     )
     
@@ -112,12 +121,22 @@ class ScrapeRequest(BaseModel):
     @field_validator('url')
     @classmethod
     def validate_url(cls, v: str) -> str:
-        """URL validasyonu"""
+        """URL validasyonu - Geliştirilmiş versiyon (Hata #6 düzeltmesi)"""
         if not v:
             raise ValueError('URL boş olamaz')
         v = v.strip()
         if not v.startswith(('http://', 'https://')):
             v = f'https://{v}'
+        
+        # Daha kapsamlı URL validasyonu
+        parsed = urlparse(v)
+        if not parsed.netloc or '.' not in parsed.netloc:
+            raise ValueError('Geçersiz URL formatı')
+        
+        # Protokol kontrolü
+        if parsed.scheme not in ('http', 'https'):
+            raise ValueError('Sadece HTTP ve HTTPS protokolleri desteklenir')
+        
         return v
     
     # ==================== SWAGGER ÖRNEKLERİ ====================
@@ -135,6 +154,7 @@ class ScrapeRequest(BaseModel):
                     "get_google_html": True,
                     "get_ddg_search": False,
                     "get_ddg_html": False,
+                    "capture_network_logs": False,
                     "force_refresh": False
                 },
                 {
@@ -146,6 +166,7 @@ class ScrapeRequest(BaseModel):
                     "get_mobile_ss": True,
                     "get_google_search": True,
                     "get_ddg_search": True,
+                    "capture_network_logs": True,
                     "force_refresh": True
                 }
             ]
@@ -255,6 +276,22 @@ class ScrapeResponse(BaseModel):
         title="Black-list'e Takılan Domain",
         description="Eğer status='blacklisted' ise, bu alan hangi domain'in black-list'te olduğunu gösterir",
         examples=["malicious-site.com"]
+    )
+    
+    # ==================== NETWORK TRAFİĞİ ====================
+    network_logs: List[dict] = Field(
+        default_factory=list,
+        title="Network Trafik Logları",
+        description="Yakalanan XHR, Fetch ve Media (video/audio) ağ trafiği",
+        examples=[
+            [{
+                "url": "https://example.com/api/data",
+                "status": 200,
+                "mimeType": "application/json",
+                "size": 12345,
+                "timestamp": 1706265600.123
+            }]
+        ]
     )
     
     # ==================== SWAGGER ÖRNEKLERİ ====================

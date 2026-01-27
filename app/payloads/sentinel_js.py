@@ -109,10 +109,14 @@ JS_SENTINEL = """
 
         document.querySelectorAll('*').forEach(el => {
             try {
-                if (el.offsetParent === null) return; // Görünmezse geç
-                
+                // OPTİMİZASYON: Görünmez elementleri işlemden geçirip CPU yorma
+                if (el.offsetParent === null) return;
                 const style = window.getComputedStyle(el);
+                if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return;
+
                 const rect = el.getBoundingClientRect();
+                if (rect.width === 0 || rect.height === 0) return;
+
                 const txt = el.innerText.toLowerCase();
 
                 // A) "X" VEYA "KAPAT" BUTONU BULUCU

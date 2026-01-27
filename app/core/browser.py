@@ -9,6 +9,7 @@ import time, os
 import threading
 import base64
 import random
+import json
 from typing import Any
 from fastapi import HTTPException
 
@@ -31,15 +32,26 @@ class BrowserManager:
     SeleniumBase tabanlı tarayıcı yöneticisi
     Thread-safe singleton pattern
     """
+    
+    _instance = None
+    _class_lock = threading.Lock()
+    
+    def __new__(cls):
+        """Thread-safe singleton pattern"""
+        if cls._instance is None:
+            with cls._class_lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+        return cls._instance
 
     def __init__(self):
         self.driver = None
         self.lock = threading.Lock()
         
         # Rastgele noise değerleri (her oturum için tutarlı) - Genişletilmiş aralık
-        self.noise_r = random.randint(-5, 5)
-        self.noise_g = random.randint(-5, 5)
-        self.noise_b = random.randint(-5, 5)
+        self.noise_r = random.randint(-20, 20)
+        self.noise_g = random.randint(-20, 20)
+        self.noise_b = random.randint(-20, 20)
         
         # Rastgele User Agent
         self.user_agent = get_random_user_agent(platform=settings.user_agent_platform)
@@ -59,12 +71,51 @@ class BrowserManager:
         try:
             os.system("pkill -9 -f chrome")
             os.system("pkill -9 -f chromedriver")
-        except: pass
+        except Exception as e:
+            logger.debug(f"Process kill hatası: {e}")
 
         logger.info("🔥 Tarayıcı Başlatılıyor...")
         logger.info(f"🌐 User Agent: {self.user_agent[:50]}...")
-        self.driver = Driver(uc=True, headless=settings.headless, incognito=True)
+        
+        # Capabilities string ile performance loglarını etkinleştir
+        caps = {
+            "goog:loggingPrefs": {"performance": "ALL"}
+        }
+        
+        self.driver = Driver(
+            uc=True,
+            headless=settings.headless,
+            incognito=True,
+            agent=self.user_agent,
+            cap_string=json.dumps(caps),
+            chromium_arg="--enable-logging --v=1"
+        )
         self.driver.set_page_load_timeout(60)
+        
+        # Garanti olması için CDP komutlarını gönder
+        try:
+            self.driver.execute_cdp_cmd('Network.enable', {})
+            self.driver.execute_cdp_cmd('Performance.enable', {})
+            logger.info("✅ Performance logları CDP ile etkinleştirildi")
+        except Exception as e:
+            logger.warning(f"⚠️ CDP log etkinleştirme uyarısı: {str(e)}")
+
+        # JS Buffer'ını Genişlet (Plan B için - KRİTİK ADIM)
+        # Normalde tarayıcı sadece 150-250 istek tutar, bunu artırıyoruz.
+        try:
+            self.driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
+                "source": "performance.setResourceTimingBufferSize(10000);"
+            })
+            logger.info("✅ JS Performance buffer genişletildi (10000)")
+        except Exception as e:
+            logger.warning(f"⚠️ JS buffer genişletme uyarısı: {str(e)}")
+        
+        # Tarayıcı başlangıcında da buffer genişlet (Hata #5 düzeltmesi)
+        try:
+            self.driver.execute_script("performance.setResourceTimingBufferSize(10000);")
+            logger.info("✅ JS Performance buffer başlangıçta genişletildi (10000)")
+        except Exception as e:
+            logger.warning(f"⚠️ JS buffer başlangıç genişletme uyarısı: {str(e)}")
         
         # ========================================
         # 0. USER AGENT ROTASYONU
@@ -164,12 +215,12 @@ class BrowserManager:
         """
         logger.warning("♻️ Tarayıcı Resetleniyor...")
         # Noise değerlerini yenile - Genişletilmiş aralık
-        self.noise_r = random.randint(-5, 5)
-        self.noise_g = random.randint(-5, 5)
-        self.noise_b = random.randint(-5, 5)
+        self.noise_r = random.randint(-20, 20)
+        self.noise_g = random.randint(-20, 20)
+        self.noise_b = random.randint(-20, 20)
         
-        # User Agent'ı yenile
-        self.user_agent = get_random_user_agent()
+        # User Agent'ı yenile (Hata #9 düzeltmesi - platform parametresi eklendi)
+        self.user_agent = get_random_user_agent(platform=settings.user_agent_platform)
         logger.info(f"🌐 Yeni User Agent: {self.user_agent[:50]}...")
         
         self.start_driver()
@@ -209,6 +260,18 @@ class BrowserManager:
             self.driver.execute_script("arguments[0].click();", element)
 
     def _switch_and_click_in_frame(self, frame_selector: str, selectors: list[str], logs: list[str], log_msg: str) -> bool:
+        """
+        Helper fonksiyon: iframe'e geç ve seçicileri dene
+        
+        Args:
+            frame_selector: iframe CSS seçicisi
+            selectors: Denenecek CSS seçicileri listesi
+            logs: Log listesi
+            log_msg: Başarılı olduğunda eklenecek mesaj
+            
+        Returns:
+            Başarılı ise True, değilse False
+        """
         """
         Helper fonksiyon: iframe'e geç ve seçicileri dene
         
@@ -373,6 +436,156 @@ class BrowserManager:
             except Exception:
                 pass
 
+    def _is_relevant_url(self, url: str, mime_type: str) -> bool:
+        """
+        Helper: Hangi URL'lerin kaydedileceğine karar verir
+
+        Args:
+            url: URL string
+            mime_type: MIME type string
+
+        Returns:
+            True if URL is relevant, False otherwise
+        """
+        mime_type = mime_type.lower()
+        url_lower = url.lower()
+        
+        # Google ve DuckDuckGo trafiğini filtrele
+        if "google.com" in url_lower or "duckduckgo.com" in url_lower:
+            return False
+        
+        is_xhr = "json" in mime_type or "xml" in mime_type or "api" in url or "ajax" in url
+        is_media = ("video" in mime_type or "audio" in mime_type or
+                    "stream" in mime_type or ".m3u8" in url or
+                    ".ts" in url or ".mp4" in url)
+                    
+        return is_xhr or is_media
+
+    def _analyze_traffic_type(self, url: str, initiator: str = "") -> str:
+        """
+        URL ve Çağıran (Initiator) bilgisine bakarak trafiğin amacını belirler.
+        Dönüş Değeri: 'api', 'tracker', 'script' veya 'ignore'
+        """
+        u = url.lower()
+        
+        # 1. KESİN REDDEDİLECEKLER (Gürültü)
+        # Görsel, Stil, Font, Medya dosyaları
+        extensions_to_ignore = [
+            '.css', '.woff', '.woff2', '.ttf', '.eot', '.svg', '.png', '.jpg',
+            '.jpeg', '.gif', '.ico', '.webp', '.mp4', '.mp3', '.m3u8', '.ts',
+            '.pdf', '.zip'
+        ]
+        if any(u.endswith(ext) or f"{ext}?" in u for ext in extensions_to_ignore):
+            return "ignore"
+
+        # 2. API / VERİ TRAFİĞİ (XHR ve Fetch)
+        # Genellikle JSON veya XML dönerler
+        is_api_keyword = "api" in u or "json" in u or "ajax" in u or "graphql" in u or "v1/" in u
+        if initiator in ['xmlhttprequest', 'fetch'] or is_api_keyword:
+            return "api"
+
+        # 3. TRACKER / ANALYTICS (Genellikle Script veya Pixel)
+        trackers = ['google-analytics', 'facebook', 'pixel', 'gtm', 'stats', 'metrics', 'telemetry']
+        if any(t in u for t in trackers):
+            return "tracker"
+
+        # 4. HARİCİ SCRIPTLER (CDN'den gelen JS kütüphaneleri veya reklamlar)
+        if u.endswith('.js') or '.js?' in u or initiator == 'script':
+            return "script"
+
+        # Geri kalanlar (Navigasyon vb.) önemsiz sayılabilir ama
+        # API kaçırmamak için şüpheli olarak işaretleyebiliriz.
+        return "ignore"
+
+    def capture_network_logs(self) -> list[dict]:
+        """
+        Sitenin dış dünya ile iletişimini (API, XHR, Tracker) analiz eder.
+        Görsel, CSS ve Medya dosyalarını filtreler.
+        """
+        relevant_logs = []
+        
+        # --- YÖNTEM 1: Driver Logları (Plan A) ---
+        try:
+            logs = self.driver.get_log("performance")
+            for entry in logs:
+                try:
+                    log_json = json.loads(entry["message"])
+                    message = log_json["message"]
+                    
+                    if message["method"] == "Network.responseReceived":
+                        params = message["params"]
+                        resp = params.get("response", {})
+                        url = resp.get("url", "")
+                        
+                        # Initiator bilgisini driver loglarından çıkarmak zor olur,
+                        # bu yüzden MIME type ve URL analizine güveniyoruz.
+                        traffic_type = self._analyze_traffic_type(url, params.get("type", "").lower())
+                        
+                        if traffic_type != "ignore":
+                            relevant_logs.append({
+                                "source": "driver",
+                                "type": traffic_type,  # api, script, tracker
+                                "domain": url.split('/')[2],  # Sadece domain (örn: api.google.com)
+                                "url": url,
+                                "status": resp.get("status", 0),
+                                "size": resp.get("encodedDataLength", 0)
+                            })
+                except: continue
+
+            # Logları okuduktan sonra temizle (Hata #2 düzeltmesi)
+            try:
+                self.driver.get_log("performance")
+            except Exception:
+                pass
+            
+            if relevant_logs:
+                logger.info(f"✅ Driver Loglarından {len(relevant_logs)} iletişim kaydı alındı.")
+                return relevant_logs
+
+        except Exception:
+            logger.warning("⚠️ Driver loglarına erişilemedi. JS Fallback (Plan B) devreye giriyor...")
+
+        # --- YÖNTEM 2: JS Performance API (Plan B - Fallback) ---
+        # BURASI ÇOK ÖNEMLİ: initiatorType alıyoruz!
+        try:
+            js_script = """
+            return performance.getEntriesByType("resource").map(r => ({
+                url: r.name,
+                initiatorType: r.initiatorType,  // xmlhttprequest, fetch, script, img, link...
+                size: r.transferSize || 0,
+                time: r.startTime
+            }));
+            """
+            js_logs = self.driver.execute_script(js_script)
+            
+            for log in js_logs:
+                url = log.get("url", "")
+                initiator = log.get("initiatorType", "").lower()
+                
+                # Yeni analiz fonksiyonunu kullan
+                traffic_type = self._analyze_traffic_type(url, initiator)
+                
+                if traffic_type != "ignore":
+                    domain = url.split('/')[2] if '//' in url else url
+                    
+                    relevant_logs.append({
+                        "source": "js_fallback",
+                        "type": traffic_type,  # api, script, tracker
+                        "domain": domain,     # İletişim kurulan sunucu
+                        "initiator": initiator,  # İstek türü (fetch, xhr)
+                        "url": url,
+                        "status": 200,
+                        "size": log.get("size", 0)
+                    })
+            
+            if relevant_logs:
+                logger.info(f"✅ JS Fallback ile {len(relevant_logs)} iletişim kaydı analiz edildi.")
+
+        except Exception as e:
+            logger.error(f"❌ Trafik analizi yapılamadı: {e}")
+
+        return relevant_logs
+
     def process(self, req: ScrapeRequest) -> ScrapeResponse:
         """
         İstemi işler ve yanıt döndürür
@@ -389,6 +602,7 @@ class BrowserManager:
         try:
             start_time = time.time()
             logs = []
+            network_data = []  # Ağ trafiği verisi en başta tanımla
             res = ScrapeResponse(status="processing", logs=[], duration=0)
             
             def log(m: str):
@@ -415,6 +629,12 @@ class BrowserManager:
                         duration=time.time() - start_time
                     )
 
+                # Sayfa yüklenmeden önce logları temizle (Hata #7 düzeltmesi)
+                try:
+                    self.driver.get_log("performance")
+                except Exception:
+                    pass
+                
                 # ADIM 1: HAM URL
                 if req.process_raw_url:
                     log(f"Adım 1: Ham URL -> {raw_url}")
@@ -426,11 +646,13 @@ class BrowserManager:
                     self.solve_captcha_and_consent(logs)
                     self.smart_wait_and_kill(req.wait_time, logs)
                     
+                    # Body check geliştirildi - JavaScript yüklenmesi için bekleme eklendi (Hata #8 düzeltmesi)
+                    time.sleep(2)  # JavaScript yüklenmesi için bekleme
                     body_text = self.driver.find_element(By.TAG_NAME, "body").text
                     if len(body_text) < 100:
                         logger.warning("Sayfa içeriği çok az, sayfa yeniden yükleniyor...")
                         self.driver.refresh()
-                        time.sleep(3)
+                        time.sleep(5)  # Yükleme süresi artırıldı
 
                     res.raw_desktop_ss = self.get_b64_screenshot()
                     if req.get_html:
@@ -469,8 +691,18 @@ class BrowserManager:
                         self.solve_captcha_and_consent(logs)
                         self.smart_wait_and_kill(req.wait_time, logs)
                         res.main_desktop_ss = self.get_b64_screenshot()
+ 
+                # 🔥 KRİTİK HAMLE: Google'a gitmeden önce AĞ TRAFİĞİNİ YAKALA! 🔥
+                if req.capture_network_logs:
+                    log("📡 Hedef site trafiği yedekleniyor...")
+                    network_data = self.capture_network_logs()
+                    log(f"✅ {len(network_data)} adet kritik ağ isteği yakalandı.")
+                
+                # -------------------------------------------------------
+                # BURADAN SONRA TARAYICI BAŞKA SİTELERE GİDECEK
+                # -------------------------------------------------------
 
-                # ADIM 3 & 4: GOOGLE ve DDG
+                # ADIM 3: GOOGLE ARAMASI (Opsiyonel)
                 if req.get_google_search:
                     log(f"🔍 Google: {domain}")
                     self.driver.get(f"https://www.google.com/search?q=site:{domain}")
@@ -480,6 +712,7 @@ class BrowserManager:
                     if req.get_google_html:
                         res.google_html = self.get_b64_html()
 
+                # ADIM 4: DUCKDUCKGO ARAMASI (Opsiyonel)
                 if req.get_ddg_search:
                     log(f"🦆 DDG: {domain}")
                     self.driver.get(f"https://duckduckgo.com/?q=site:{domain}")
@@ -487,6 +720,10 @@ class BrowserManager:
                     res.ddg_ss = self.get_b64_screenshot()
                     if req.get_ddg_html:
                         res.ddg_html = self.get_b64_html()
+                
+                # Ağ trafiği verisini yanıta ekle
+                if req.capture_network_logs:
+                    res.network_logs = network_data
 
                 res.status = "success"
                 log("✅ Bitti")

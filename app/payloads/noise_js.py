@@ -17,46 +17,77 @@ def get_consistent_noise_js(r_shift: int, g_shift: int, b_shift: int) -> str:
     Returns:
         JavaScript kodu string olarak
     """
+    # Python tarafında hesaplamaları yap (JS içinde abs() hatası almamak için)
+    r_factor = abs(r_shift) * 2 + 3
+    g_factor = abs(g_shift) * 2 + 3
+    b_factor = abs(b_shift) * 2 + 3
+    
+    # WebGL varyasyonları için seed değerleri oluştur (Hata #13 düzeltmesi)
+    vendor_seed = abs(r_shift) % 3
+    renderer_seed = abs(g_shift) % 3
+    
+    # WebGL vendor seçenekleri
+    vendor_options = [
+        "Intel Inc.",
+        "NVIDIA Corporation",
+        "AMD"
+    ]
+    
+    # WebGL renderer seçenekleri
+    renderer_options = [
+        "Intel(R) UHD Graphics 620",
+        "NVIDIA GeForce GTX 1650",
+        "AMD Radeon RX 580"
+    ]
+    
+    vendor = vendor_options[vendor_seed]
+    renderer = renderer_options[renderer_seed]
+
     return f"""
-    (() => {{
+    (function() {{
+        // Değerler Python'dan hazır geliyor
+        const shift = {{ r: {r_shift}, g: {g_shift}, b: {b_shift} }};
+        const factor = {{ r: {r_factor}, g: {g_factor}, b: {b_factor} }};
+
         // ========================================
         // 1. CANVAS 2D NOISE (Dinamik ve Piksel Bazlı)
         // ========================================
-        const getContext = HTMLCanvasElement.prototype.getContext;
-        HTMLCanvasElement.prototype.getContext = function(type) {{
-            const ctx = getContext.apply(this, arguments);
-            if (type === '2d') {{
-                const originalGetImageData = ctx.getImageData;
-                ctx.getImageData = function(x, y, w, h) {{
-                    const imageData = originalGetImageData.apply(this, arguments);
+        const originalGetContext = HTMLCanvasElement.prototype.getContext;
+        HTMLCanvasElement.prototype.getContext = function(type, options) {{
+            const context = originalGetContext.call(this, type, options);
+
+            if (context && (type === '2d' || type === 'webgl' || type === 'experimental-webgl')) {{
+                const originalGetImageData = context.getImageData;
+                context.getImageData = function(x, y, w, h) {{
+                    const imageData = originalGetImageData.call(this, x, y, w, h);
                     const data = imageData.data;
-                    
-                    // Noise map - tutarlı ama dinamik
-                    const noiseMap = new Map();
-                    
+                    const noiseMap = new Map(); // Performans için cache
+
                     for (let i = 0; i < data.length; i += 4) {{
+                        // Piksel koordinatına göre key üret
                         const pixelIndex = Math.floor(i / 4);
-                        const x = pixelIndex % w;
-                        const y = Math.floor(pixelIndex / w);
-                        const key = `${{x}}_${{y}}_${{pixelIndex}}`;
-                        
+                        const px = pixelIndex % w;
+                        const py = Math.floor(pixelIndex / w);
+                        const key = `${{px}}_${{py}}_${{pixelIndex}}`;
+
                         if (!noiseMap.has(key)) {{
                             noiseMap.set(key, {{
-                                r: (Math.random() - 0.5) * {abs(r_shift) * 2 + 3},
-                                g: (Math.random() - 0.5) * {abs(g_shift) * 2 + 3},
-                                b: (Math.random() - 0.5) * {abs(b_shift) * 2 + 3}
+                                r: (Math.random() - 0.5) * factor.r,
+                                g: (Math.random() - 0.5) * factor.g,
+                                b: (Math.random() - 0.5) * factor.b
                             }});
                         }}
-                        
+
                         const noise = noiseMap.get(key);
-                        data[i] = Math.min(255, Math.max(0, data[i] + noise.r + {r_shift}));
-                        data[i+1] = Math.min(255, Math.max(0, data[i+1] + noise.g + {g_shift}));
-                        data[i+2] = Math.min(255, Math.max(0, data[i+2] + noise.b + {b_shift}));
+                        // Renkleri kaydır ve 0-255 sınırında tut
+                        data[i] = Math.min(255, Math.max(0, data[i] + noise.r + shift.r));
+                        data[i+1] = Math.min(255, Math.max(0, data[i+1] + noise.g + shift.g));
+                        data[i+2] = Math.min(255, Math.max(0, data[i+2] + noise.b + shift.b));
                     }}
                     return imageData;
                 }};
             }}
-            return ctx;
+            return context;
         }};
 
         // ========================================
@@ -65,18 +96,18 @@ def get_consistent_noise_js(r_shift: int, g_shift: int, b_shift: int) -> str:
         const webGLGetParameter = WebGLRenderingContext.prototype.getParameter;
         WebGLRenderingContext.prototype.getParameter = function(param) {{
             const result = webGLGetParameter.apply(this, arguments);
-            
-            // Vendor ve Renderer string'lerini standartlaştır
+
+            // Vendor ve Renderer string'lerini varyasyonlu yap (Hata #13 düzeltmesi)
             if (param === this.VENDOR) {{
-                return "Intel Inc.";
+                return "{vendor}";
             }}
             if (param === this.RENDERER) {{
-                return "Intel(R) UHD Graphics 620";
+                return "{renderer}";
             }}
             if (param === this.UNMASKED_RENDERER_WEBGL) {{
-                return "Intel(R) UHD Graphics 620 Direct3D11 vs_5_0 ps_5_0";
+                return "{renderer} Direct3D11 vs_5_0 ps_5_0";
             }}
-            
+
             // Max texture size ve diğer parametreleri hafifçe değiştir
             if (param === this.MAX_TEXTURE_SIZE) {{
                 return result - Math.floor(Math.random() * 100);
@@ -84,7 +115,7 @@ def get_consistent_noise_js(r_shift: int, g_shift: int, b_shift: int) -> str:
             if (param === this.MAX_VIEWPORT_DIMS) {{
                 return [result[0] - Math.floor(Math.random() * 10), result[1] - Math.floor(Math.random() * 10)];
             }}
-            
+
             return result;
         }};
 
@@ -93,14 +124,14 @@ def get_consistent_noise_js(r_shift: int, g_shift: int, b_shift: int) -> str:
             const webGL2GetParameter = WebGL2RenderingContext.prototype.getParameter;
             WebGL2RenderingContext.prototype.getParameter = function(param) {{
                 const result = webGL2GetParameter.apply(this, arguments);
-                
+
                 if (param === this.VENDOR) {{
-                    return "Intel Inc.";
+                    return "{vendor}";
                 }}
                 if (param === this.RENDERER) {{
-                    return "Intel(R) UHD Graphics 620";
+                    return "{renderer}";
                 }}
-                
+
                 return result;
             }};
         }}
@@ -111,12 +142,12 @@ def get_consistent_noise_js(r_shift: int, g_shift: int, b_shift: int) -> str:
         const audioGetChannelData = AudioBuffer.prototype.getChannelData;
         AudioBuffer.prototype.getChannelData = function(channel) {{
             const result = audioGetChannelData.apply(this, arguments);
-            
+
             // Her sample'a çok küçük noise ekle
             for (let i = 0; i < result.length; i++) {{
                 result[i] = result[i] + (Math.random() - 0.5) * 0.0001;
             }}
-            
+
             return result;
         }};
 
@@ -125,34 +156,43 @@ def get_consistent_noise_js(r_shift: int, g_shift: int, b_shift: int) -> str:
         AudioContext.prototype.createAnalyser = function() {{
             const analyser = originalCreateAnalyser.apply(this, arguments);
             const originalGetFloatFrequencyData = analyser.getFloatFrequencyData;
-            
+
             analyser.getFloatFrequencyData = function(array) {{
                 originalGetFloatFrequencyData.apply(this, arguments);
                 for (let i = 0; i < array.length; i++) {{
                     array[i] = array[i] + (Math.random() - 0.5) * 0.001;
                 }}
             }};
-            
+
             return analyser;
         }};
 
         // ========================================
-        // 4. FONT FINGERPRINTING KORUMASI
+        // 4. FONT FINGERPRINTING KORUMASI (Safe Mode)
         // ========================================
-        // Font detection API'yi manipüle et
-        const originalHas = Set.prototype.has;
-        Set.prototype.has = function(value) {{
-            // Font check'leri için özel davranış
-            if (this === document.fonts) {{
-                // Standart fontları koru, diğerlerini filtrele
-                const standardFonts = ['Arial', 'Times New Roman', 'Courier New', 'Verdana', 'Georgia', 'Palatino', 'Garamond', 'Bookman', 'Comic Sans MS', 'Trebuchet MS', 'Arial Black', 'Impact'];
-                if (standardFonts.includes(value.family)) {{
-                    return originalHas.apply(this, arguments);
+        // Sadece document.fonts nesnesini hedefliyoruz, tüm Set'leri değil.
+        if (document.fonts) {{
+            const standardFonts = ['Arial', 'Times New Roman', 'Courier New', 'Verdana', 'Georgia', 'Palatino', 'Garamond', 'Bookman', 'Comic Sans MS', 'Trebuchet MS', 'Arial Black', 'Impact'];
+
+            // 4a. document.fonts.has override
+            const originalFontsHas = document.fonts.has;
+            document.fonts.has = function(value) {{
+                if (value && value.family && standardFonts.includes(value.family)) {{
+                    return originalFontsHas.apply(this, arguments);
                 }}
-                return false;
-            }}
-            return originalHas.apply(this, arguments);
-        }};
+                return false; // Standart dışı fontları gizle
+            }};
+
+            // 4b. document.fonts.check override
+            const originalFontsCheck = document.fonts.check;
+            document.fonts.check = function(font) {{
+                // Font string içinde standart fontlardan biri geçiyor mu?
+                for (const std of standardFonts) {{
+                    if (font.includes(std)) return true;
+                }}
+                return originalFontsCheck.apply(this, arguments);
+            }};
+        }}
 
         // ========================================
         // 5. SCREEN VE DISPLAY MANİPÜLASYONU
@@ -176,5 +216,6 @@ def get_consistent_noise_js(r_shift: int, g_shift: int, b_shift: int) -> str:
             }}
         }});
 
+        console.log("🛡️ Anti-Fingerprint v2 (Safe Mode) aktif.");
     }})();
     """

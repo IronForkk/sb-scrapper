@@ -22,13 +22,16 @@ SeleniumBase tabanlı, gelişmiş anti-detection özelliklerine sahip web scrapi
 
 ### 🔒 Anti-Detection Özellikleri
 - **WebDriver Gizleme:** `navigator.webdriver` özelliğini manipüle ederek bot tespitini önler
-- **Canvas Fingerprinting Koruması:** Dinamik ve tutarlı canvas gürültüsü ekler
-- **WebGL Fingerprinting Koruması:** Vendor ve renderer bilgilerini standartlaştırır
+- **Canvas Fingerprinting Koruması:** Dinamik ve tutarlı canvas gürültüsü ekler (piksel bazlı)
+- **WebGL Fingerprinting Koruması:** Vendor ve renderer bilgilerini standartlaştırır (Intel, NVIDIA, AMD)
 - **Audio Fingerprinting Koruması:** AudioContext ve analizör fonksiyonlarını manipüle eder
 - **Font Fingerprinting Koruması:** Font detection API'yi filtreler
 - **Screen/Display Manipülasyonu:** Ekran çözünürlük değerlerini hafifçe değiştirir
-- **User Agent Rotasyonu:** Windows, macOS ve Linux için farklı User Agent'lar
+- **Navigator API Manipülasyonu:** `plugins`, `languages`, `platform`, `hardwareConcurrency` vb. değerleri düzenler
 - **Chrome Object Emülasyonu:** Gerçek Chrome tarayıcı gibi görünür
+- **Headless Detection Bypass:** `navigator.headless` değerini gizler
+- **SeleniumBase Detection Bypass:** Selenium'in eklediği değişkenleri temizler
+- **Connection API:** Sahte bağlantı bilgileri sağlar
 
 ### 🛡️ Captcha Çözme
 - **Google Consent:** Google çerez onay formlarını otomatik kabul eder
@@ -44,10 +47,19 @@ SeleniumBase tabanlı, gelişmiş anti-detection özelliklerine sahip web scrapi
 - **HTML Kaynak Kodu:** Sayfa kaynak kodlarını Base64 formatında alır
 - **Google Arama:** Siteyi Google'da aratıp sonuç ekran görüntüsünü alır
 - **DuckDuckGo Arama:** Siteyi DuckDuckGo'da aratıp sonuç ekran görüntüsünü alır
+- **Network Trafik Logları (Opsiyonel):** XHR, Fetch ve Media (video/audio) ağ trafiğini yakalar
+
+### 📡 Network Trafik Analizi
+- **API Trafiği:** JSON/XML/API çağrılarını tespit eder
+- **Tracker Trafiği:** Analytics ve tracker çağrılarını tespit eder
+- **Script Trafiği:** Harici JavaScript yüklemelerini tespit eder
+- **Gürültü Filtreleme:** CSS, font, görsel ve medya dosyalarını filtreler
+- **Çift Yöntem:** Driver logları ve JS Performance API ile geri dönüşlü yakalama
 
 ### 🚫 Black-List Koruması
 - 500+ önceden tanımlanmış domain filtresi
 - URL ve domain bazlı kontrol
+- Subdomain kontrolü (parent domain'leri de kontrol eder)
 - Otomatik filtreleme ve loglama
 
 ### 🧹 Popup Temizleme (Sentinel JS)
@@ -56,12 +68,20 @@ SeleniumBase tabanlı, gelişmiş anti-detection özelliklerine sahip web scrapi
 - Yasaklı kelime filtrelemesi
 - Geometrik av (yan bantlar, tam ekran overlay'ler)
 - MutationObserver ile sürekli DOM izleme
+- Performans optimizasyonu (debounce ve requestAnimationFrame)
+
+### 🌐 User Agent Rotasyonu
+- **Windows:** Chrome 119-120, Firefox 120-121, Edge 120
+- **macOS:** Chrome 119-120, Firefox 121, Safari 17.2
+- **Linux:** Chrome 120, Firefox 121
+- Platform seçimi `.env` dosyasından yapılandırılabilir
 
 ### 📊 Loglama
-- Renkli konsol logları
+- Renkli konsol logları (Loguru)
 - Dosya tabanlı loglama (info.log, error.log)
 - Otomatik log rotasyonu (10 MB)
 - Log saklama süresi (7-30 gün)
+- Zaman damgalı ve formatlı loglar
 
 ## 🏗️ Teknik Mimari
 
@@ -70,28 +90,42 @@ SeleniumBase tabanlı, gelişmiş anti-detection özelliklerine sahip web scrapi
 │                     FastAPI Application                      │
 │                    (app/main.py)                            │
 └────────────────────────┬────────────────────────────────────┘
-                         │
-                         ▼
+                          │
+                          ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                   BrowserManager                            │
 │                  (app/core/browser.py)                       │
 │  ┌──────────────────────────────────────────────────────┐  │
 │  │  SeleniumBase Driver (Chrome)                        │  │
 │  │  - Anti-Detection Scripts                            │  │
-│  │  - Canvas Noise                                      │  │
+│  │  - Canvas Noise (Dinamik Piksel)                     │  │
+│  │  - WebGL/Audio/Font Protection                       │  │
 │  │  - User Agent Rotation                               │  │
-│  │  - Captcha Solver                                    │  │
+│  │  - Captcha Solver (5 Tür)                            │  │
 │  │  - Popup Cleaner (Sentinel)                         │  │
+│  │  - Network Traffic Capture                          │  │
 │  └──────────────────────────────────────────────────────┘  │
 └────────────────────────┬────────────────────────────────────┘
-                         │
-         ┌───────────────┼───────────────┐
-         ▼               ▼               ▼
+                          │
+          ┌───────────────┼───────────────┐
+          ▼               ▼               ▼
 ┌────────────────┐ ┌──────────────┐ ┌─────────────┐
 │ BlacklistMgr   │ │ Logger       │ │ Config      │
 │ (black-list)   │ │ (Loguru)     │ │ (Pydantic)  │
 └────────────────┘ └──────────────┘ └─────────────┘
 ```
+
+### Teknoloji Stack
+
+| Bileşen | Teknoloji |
+|---------|-----------|
+| Web Framework | FastAPI |
+| Web Scraping | SeleniumBase |
+| Validation | Pydantic |
+| Logging | Loguru |
+| ASGI Server | Uvicorn / Gunicorn |
+| Database | PostgreSQL (Opsiyonel) |
+| Containerization | Docker / Docker Compose |
 
 ## 📦 Kurulum
 
@@ -136,6 +170,14 @@ docker-compose logs -f
 docker-compose down
 ```
 
+### Multi-Stage Build
+
+Dockerfile, optimize edilmiş multi-stage build kullanır:
+
+1. **Base Stage:** Ubuntu 22.04, Chrome, sistem bağımlılıkları
+2. **Python-Dep Stage:** SeleniumBase ve chromedriver kurulumu
+3. **Final Stage:** Uygulama ve bağımlılıklar
+
 ### Ortam Değişkenleri
 
 ```yaml
@@ -145,6 +187,7 @@ WAIT_TIME=8            # Sayfa yükleme bekleme süresi (saniye)
 LOG_LEVEL=INFO         # Log seviyesi (DEBUG, INFO, WARNING, ERROR)
 BLACKLIST_FILE=black-list.lst  # Black-list dosya yolu
 PORT=8000              # API portu
+USER_AGENT_PLATFORM=windows  # User Agent platform (windows/macos/linux)
 ```
 
 ## 🚀 Kullanım
@@ -168,6 +211,7 @@ payload = {
     "get_google_html": True,
     "get_ddg_search": True,
     "get_ddg_html": True,
+    "capture_network_logs": False,  # Ağ trafiğini yakalamak için True yapın
     "force_refresh": False
 }
 
@@ -183,6 +227,12 @@ if result.get('raw_desktop_ss'):
 print(f"Durum: {result['status']}")
 print(f"Süre: {result['duration']:.2f} saniye")
 print(f"Loglar: {result['logs']}")
+
+# Network trafiği (capture_network_logs=True ise)
+if result.get('network_logs'):
+    print(f"Yakalanan ağ istekleri: {len(result['network_logs'])}")
+    for log in result['network_logs']:
+        print(f"  - {log['type']}: {log['domain']}")
 ```
 
 ### cURL ile Kullanım
@@ -198,7 +248,8 @@ curl -X POST "http://localhost:8000/analyze" \
     "get_html": true,
     "get_mobile_ss": true,
     "get_google_search": true,
-    "get_ddg_search": true
+    "get_ddg_search": true,
+    "capture_network_logs": false
   }'
 ```
 
@@ -246,6 +297,7 @@ Belirtilen URL'i tarar ve çeşitli çıktılar üretir.
   "get_google_html": true,
   "get_ddg_search": true,
   "get_ddg_html": true,
+  "capture_network_logs": false,
   "force_refresh": false
 }
 ```
@@ -264,6 +316,7 @@ Belirtilen URL'i tarar ve çeşitli çıktılar üretir.
 | `get_google_html` | boolean | Hayır | true | Google arama sonucu HTML'ini alır |
 | `get_ddg_search` | boolean | Hayır | true | DuckDuckGo arama sonucu alır |
 | `get_ddg_html` | boolean | Hayır | true | DuckDuckGo arama sonucu HTML'ini alır |
+| `capture_network_logs` | boolean | Hayır | false | XHR, Fetch ve Media (video/audio) ağ trafiğini yakalar |
 | `force_refresh` | boolean | Hayır | false | Tarayıcıyı zorla yeniden başlatır |
 
 **Response:**
@@ -284,9 +337,21 @@ Belirtilen URL'i tarar ve çeşitli çıktılar üretir.
     "✅ Bitti"
   ],
   "duration": 12.45,
-  "blacklisted_domain": null
+  "blacklisted_domain": null,
+  "network_logs": [
+    {
+      "source": "driver",
+      "type": "api",
+      "domain": "api.example.com",
+      "url": "https://api.example.com/data",
+      "status": 200,
+      "size": 12345
+    }
+  ]
 }
 ```
+
+**Not:** `network_logs` alanı sadece `capture_network_logs: true` olarak ayarlandığında dolu gelir. Varsayılan olarak boş liste döner.
 
 **Durum Kodları:**
 - `200` - Başarılı
@@ -297,6 +362,7 @@ Belirtilen URL'i tarar ve çeşitli çıktılar üretir.
 - `success` - İşlem başarıyla tamamlandı
 - `error` - İşlem sırasında hata oluştu
 - `blacklisted` - Domain black-list'te bulundu
+- `processing` - İşlem devam ediyor (geçici durum)
 
 ### Swagger UI
 
@@ -336,6 +402,21 @@ LOG_ERROR_FILE=error.log # Error log dosyası
 BLACKLIST_FILE=black-list.lst  # Black-list dosya yolu
 ```
 
+### Veritabanı Desteği (Opsiyonel)
+
+Proje PostgreSQL veritabanı desteği ile birlikte gelir. Veritabanı bağlantısı için gerekli ayarlar:
+
+```bash
+# Veritabanı Ayarları (.env dosyasına eklenebilir)
+DB_HOST=localhost      # Veritabanı host adresi
+DB_PORT=5432           # Veritabanı portu
+DB_NAME=sb_scraper     # Veritabanı adı
+DB_USER=postgres       # Veritabanı kullanıcı adı
+DB_PASSWORD=secret     # Veritabanı şifresi
+```
+
+**Not:** Veritabanı bağlantısı şu an opsiyonel olarak eklenmiştir ve gelecekteki sürümlerde kullanılacaktır.
+
 ### Black-List Yönetimi
 
 Black-list dosyası [`black-list.lst`](black-list.lst:1) her satıra bir domain olacak şekilde düzenlenir:
@@ -363,24 +444,24 @@ sb-scrapper/
 ├── app/
 │   ├── __init__.py
 │   ├── main.py                 # FastAPI ana uygulaması
-│   ├── config.py              # Konfigürasyon yönetimi
-│   ├── schemas.py              # Pydantic modelleri
+│   ├── config.py              # Konfigürasyon yönetimi (Pydantic Settings)
+│   ├── schemas.py              # Pydantic modelleri (Request/Response)
 │   ├── swagger_config.py       # Swagger UI özelleştirme
 │   │
 │   ├── core/
 │   │   ├── __init__.py
-│   │   ├── browser.py          # Tarayıcı yöneticisi
+│   │   ├── browser.py          # Tarayıcı yöneticisi (Singleton)
 │   │   ├── blacklist.py        # Black-list yönetimi
 │   │   └── logger.py           # Loguru loglama
 │   │
 │   ├── payloads/
 │   │   ├── __init__.py
-│   │   ├── noise_js.py         # Canvas noise JavaScript
+│   │   ├── noise_js.py         # Canvas noise JavaScript (Anti-Fingerprint)
 │   │   └── sentinel_js.py      # Popup temizleme JavaScript
 │   │
 │   └── utils/
 │       ├── __init__.py
-│       └── user_agents.py      # User Agent listesi
+│       └── user_agents.py      # User Agent listesi (Windows/macOS/Linux)
 │
 ├── static/
 │   └── swagger-ui.css          # Swagger UI özel stilleri
@@ -389,12 +470,14 @@ sb-scrapper/
 │
 ├── black-list.lst              # Black-list domain listesi
 ├── requirements.txt            # Python bağımlılıkları
-├── Dockerfile                  # Docker imajı
+├── Dockerfile                  # Docker imajı (Multi-stage build)
 ├── docker-compose.yml          # Docker Compose konfigürasyonu
 ├── .env.example                # Örnek ortam değişkenleri
-└── .gitignore                  # Git ignore dosyası
+├── .gitignore                  # Git ignore dosyası
+├── .dockerignore               # Docker ignore dosyası
+├── LICENSE                     # MIT Lisans dosyası
+└── README.md                   # Bu dosya
 ```
-
 ## ❓ Sık Karşılaşılan Sorular
 
 ### Q: Tarayıcı neden headless modda çalışıyor?
@@ -421,11 +504,25 @@ example.com
 www.example.com
 ```
 
+### Q: Subdomain kontrolü nasıl çalışır?
+
+A: Black-list sistemi subdomain'leri de kontrol eder. Örneğin, `example.com` black-list'teyse, `sub.example.com` da otomatik olarak engellenir.
+
+### Q: Network trafiği nasıl yakalanır?
+
+A: `capture_network_logs: true` parametresini kullanarak XHR, Fetch ve Media trafiğini yakalayabilirsiniz. Sistem iki yöntem kullanır:
+1. Driver logları (Chrome DevTools Performance API)
+2. JS Performance API (Fallback)
+
 ### Q: Log dosyaları nerede?
 
 A: Varsayılan olarak `logs/` klasöründe:
 - `info.log` - INFO seviyesindeki loglar
 - `error.log` - ERROR seviyesindeki loglar
+
+### Q: User Agent nasıl değiştirilir?
+
+A: `.env` dosyasında `USER_AGENT_PLATFORM` değerini değiştirerek platform seçebilirsiniz: `windows`, `macos`, veya `linux`.
 
 ### Q: Docker konteyneri başlamıyor, ne yapmalıyım?
 
@@ -439,6 +536,15 @@ docker-compose logs sb-scraper
 
 A: `force_refresh: true` parametresini kullanarak tarayıcıyı düzenli olarak yeniden başlatın.
 
+### Q: Popup temizleme nasıl çalışır?
+
+A: Sentinel JS scripti şu teknikleri kullanır:
+- CSS selector ile popup'ları gizler
+- Z-index bazlı overlay kontrolü
+- Yasaklı kelime filtrelemesi
+- Geometrik av (yan bantlar, tam ekran overlay'ler)
+- MutationObserver ile sürekli DOM izleme
+
 ## 📄 Lisans
 
 Bu proje MIT Lisansı altında lisanslanmıştır. Detaylar için [LICENSE](LICENSE) dosyasına bakın.
@@ -448,6 +554,24 @@ Bu proje MIT Lisansı altında lisanslanmıştır. Detaylar için [LICENSE](LICE
 - [SeleniumBase](https://github.com/seleniumbase/SeleniumBase) - Güçlü web scraping kütüphanesi
 - [FastAPI](https://fastapi.tiangolo.com/) - Modern web framework
 - [Loguru](https://github.com/Delgan/loguru) - Güzel loglama kütüphanesi
+- [Uvicorn](https://www.uvicorn.org/) - ASGI sunucusu
+- [Gunicorn](https://gunicorn.org/) - WSGI sunucusu (production için)
+- [Pydantic](https://pydantic-docs.helpmanual.io/) - Veri doğrulama kütüphanesi
+
+## 🤝 Katkıda Bulunma
+
+Katkılarınızı bekliyoruz! Lütfen şu adımları izleyin:
+
+1. Projeyi fork'layın
+2. Feature branch oluşturun (`git checkout -b feature/AmazingFeature`)
+3. Değişikliklerinizi commit edin (`git commit -m 'Add some AmazingFeature'`)
+4. Branch'inizi push edin (`git push origin feature/AmazingFeature`)
+5. Pull Request açın
+
+## 📞 İletişim
+
+- **Email:** support@example.com
+- **GitHub:** https://github.com/example/sb-scrapper/issues
 
 ---
 

@@ -70,6 +70,7 @@ class BlacklistManager:
     def is_blacklisted(self, url_or_domain: str) -> bool:
         """
         Domain'in black-list'te olup olmadığını kontrol eder
+        Subdomain kontrolü de yapar (Hata #3 düzeltmesi)
 
         Args:
             url_or_domain: Kontrol edilecek URL veya domain
@@ -78,7 +79,19 @@ class BlacklistManager:
             True if blacklisted, False otherwise
         """
         domain = self._extract_domain(url_or_domain)
-        return domain in self.blacklist
+        
+        # Tam eşleşme kontrolü
+        if domain in self.blacklist:
+            return True
+        
+        # Subdomain kontrolü - parent domain'leri kontrol et
+        parts = domain.split('.')
+        for i in range(1, len(parts)):  # İlk parçadan başla (subdomain'i atla)
+            parent_domain = '.'.join(parts[i:])
+            if parent_domain in self.blacklist:
+                return True
+        
+        return False
 
     def get_blacklist_count(self) -> int:
         """
