@@ -301,7 +301,7 @@ class PostgresLogger:
                     timestamp, ip, port, method, path, full_url,
                     headers, query_params, user_agent, body, body_error,
                     response_status_code, response_time_ms
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9, $10::jsonb, $11::jsonb, $12, $13)
             """,
                 datetime.now(timezone.utc),
                 request_data.get('ip'),

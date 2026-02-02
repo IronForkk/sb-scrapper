@@ -72,13 +72,18 @@ SB-Scraper, bu engelleri aşmak için gelişmiş teknikler kullanır:
 
 ### 📊 Loglama ve İzleme
 - **PostgreSQL Loglama**: Tüm loglar veritabanında saklanır
+- **JSONB Desteği**: JSON alanları JSONB tipinde saklanır (performans optimizasyonu)
 - **Request Tracking**: Her isteğin detayları (IP, headers, query params, response time) loglanır
 - **Domain Stats**: Scraping istatistikleri (success/error count, success rate) takip edilir
 - **Error Logging**: Hatalar ayrı bir tabloda saklanır, hızlı sorgulama için optimize edilir
 - **Structured Logging**: JSON formatında loglama (opsiyonel)
+- **Partitioning**: Log tabloları aylık partition'larda saklanır (büyük veri için optimizasyon)
+- **Retention Policy**: Otomatik log temizleme (cron job ile)
 
 ### 🎛️ Yönetim ve İzleme
 - **Log Viewer Web UI**: PostgreSQL loglarını görselleştiren Flask uygulaması
+- **Canlı Güncelleme**: Polling tabanlı gerçek zamanlı log güncellemeleri
+- **Gelişmiş Filtreler**: Modül, metin arama ve seviye filtreleri
 - **System Monitor**: RAM/CPU kullanımını izler, otomatik temizlik yapar
 - **Health Check**: `/health` endpoint ile servis durumu kontrolü
 - **Swagger UI**: Otomatik API dokümantasyonu
@@ -282,11 +287,15 @@ GRANT ALL PRIVILEGES ON DATABASE sb_scrapper TO sb_user;
 ```
 
 5. **Migration'ları çalıştırın:**
-```bash
-psql -U sb_user -d sb_scrapper -f migrations/001_initial_schema.sql
-psql -U sb_user -d sb_scrapper -f migrations/002_add_indexes.sql
-psql -U sb_user -d sb_scrapper -f migrations/003_cleanup_function.sql
-```
+   ```bash
+   # Migrasyonları sırayla çalıştırın
+   psql -U sb_user -d sb_scrapper -f migrations/001_initial_schema.sql
+   psql -U sb_user -d sb_scrapper -f migrations/002_add_indexes.sql
+   psql -U sb_user -d sb_scrapper -f migrations/003_cleanup_function.sql
+   psql -U sb_user -d sb_scrapper -f migrations/004_jsonb_migration.sql
+   psql -U sb_user -d sb_scrapper -f migrations/005_partitioning.sql
+   psql -U sb_user -d sb_scrapper -f migrations/006_retention_policy.sql
+   ```
 
 6. **Uygulamayı başlatın:**
 ```bash
@@ -593,6 +602,8 @@ http://localhost:5000
 - Flask uygulaması
 - PostgreSQL'e bağımlı
 - Health check
+- Connection pool optimizasyonu
+- Polling tabanlı canlı güncelleme
 
 ### Docker Komutları
 
@@ -678,6 +689,7 @@ sb-scrapper/
 │
 ├── log-viewer/
 │   ├── app.py                  # Flask uygulaması
+│   ├── db_pool.py              # Connection pool context manager
 │   ├── Dockerfile              # Log viewer Dockerfile
 │   ├── requirements.txt        # Python bağımlılıkları
 │   ├── static/                 # Static dosyalar
@@ -691,7 +703,10 @@ sb-scrapper/
 ├── migrations/
 │   ├── 001_initial_schema.sql  # Tablolar
 │   ├── 002_add_indexes.sql     # İndeksler
-│   └── 003_cleanup_function.sql # Cleanup fonksiyonu
+│   ├── 003_cleanup_function.sql # Cleanup fonksiyonu
+│   ├── 004_jsonb_migration.sql # JSONB migrasyonu
+│   ├── 005_partitioning.sql    # Partitioning
+│   └── 006_retention_policy.sql # Retention policy
 │
 ├── static/
 │   └── swagger-ui.css          # Custom Swagger CSS

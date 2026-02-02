@@ -3,6 +3,7 @@ SQLAlchemy ORM Modelleri
 PostgreSQL tabloları için modeller
 """
 from sqlalchemy import Column, BigInteger, String, Integer, Text, DateTime, Numeric, CheckConstraint
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
 
@@ -20,7 +21,7 @@ class ApplicationLog(Base):
     function_name = Column(String(255))
     line_number = Column(Integer)
     message = Column(Text, nullable=False)
-    extra_data = Column(Text)  # JSONB yerine Text (asyncpg için)
+    extra_data = Column(JSONB)  # JSONB desteği
     created_at = Column(DateTime(timezone=True), default=func.now())
 
     __table_args__ = (
@@ -39,11 +40,11 @@ class RequestLog(Base):
     method = Column(String(10), nullable=False)
     path = Column(Text, nullable=False)
     full_url = Column(Text)
-    headers = Column(Text)  # JSONB yerine Text (asyncpg için)
-    query_params = Column(Text)  # JSONB yerine Text (asyncpg için)
+    headers = Column(JSONB)  # JSONB desteği
+    query_params = Column(JSONB)  # JSONB desteği
     user_agent = Column(Text)
-    body = Column(Text)
-    body_error = Column(Text)
+    body = Column(JSONB)  # JSONB desteği
+    body_error = Column(JSONB)  # JSONB desteği
     response_status_code = Column(Integer)
     response_time_ms = Column(Integer)
     created_at = Column(DateTime(timezone=True), default=func.now())
@@ -84,7 +85,7 @@ class ErrorLog(Base):
     stack_trace = Column(Text)
     url = Column(Text)
     domain = Column(String(255))
-    extra_data = Column(Text)  # JSONB yerine Text (asyncpg için)
+    extra_data = Column(JSONB)  # JSONB desteği
     created_at = Column(DateTime(timezone=True), default=func.now())
 
     __table_args__ = (

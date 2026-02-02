@@ -6,15 +6,86 @@ import os
 import csv
 import io
 import json
+import time
 from collections import Counter
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict, Any
-from flask import Flask, render_template, jsonify, request, Response
+from flask import Flask, render_template, jsonify, request, Response, stream_with_context
 
-import psycopg2
-from psycopg2 import pool
-from psycopg2.extras import RealDictCursor
-
+# db_pool modülünü import et (log-viewer klasörü içinde)
+try:
+    from db_pool import get_db_cursor, execute_query, postgres_pool, get_pool_stats
+except ImportError:
+    # Geriye uyumlu: db_pool yoksa eski yöntemi kullan
+    import psycopg2
+    from psycopg2 import pool
+    from psycopg2.extras import RealDictCursor
+    
+    POSTGRES_HOST = os.getenv('POSTGRES_HOST', 'postgres')
+    POSTGRES_PORT = int(os.getenv('POSTGRES_PORT', 5432))
+    POSTGRES_DB = os.getenv('POSTGRES_DB', 'sb_scrapper')
+    POSTGRES_USER = os.getenv('POSTGRES_USER', 'sb_user')
+    POSTGRES_PASSWORD = os.getenv('POSTGRES_PASSWORD', '')
+    
+    postgres_pool = psycopg2.pool.ThreadedConnectionPool(
+        minconn=1,
+        maxconn=10,
+        host=POSTGRES_HOST,
+        port=POSTGRES_PORT,
+        database=POSTGRES_DB,
+        user=POSTGRES_USER,
+        password=POSTGRES_PASSWORD
+    )
+    
+    def get_db_connection():
+        return postgres_pool.getconn()
+    
+    def release_db_connection(conn):
+        postgres_pool.putconn(conn)
+    
+    def execute_query(query: str, params: tuple = None, fetch_all: bool = True) -> list:
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute(query, params or ())
+            result = cursor.fetchall() if fetch_all else cursor.fetchone()
+            cursor.close()
+            release_db_connection(conn)
+            
+            if isinstance(result, list):
+                for row in result:
+                    for key, value in row.items():
+                        if isinstance(value, datetime):
+                            row[key] = value.isoformat()
+            elif result:
+                for key, value in result.items():
+                    if isinstance(value, datetime):
+                        result[key] = value.isoformat()
+            
+            return result if fetch_all else ([result] if result else [])
+        except Exception as e:
+            print(f"Query hatası: {e}")
+            return []
+    
+    def get_pool_stats() -> dict:
+        try:
+            return {
+                'minconn': postgres_pool.minconn,
+                'maxconn': postgres_pool.maxconn,
+                'closed': postgres_pool.closed
+            }
+        except Exception as e:
+            return {'error': str(e)}
+    
+    from contextlib import contextmanager
+    @contextmanager
+    def get_db_cursor():
+        with get_db_connection() as conn:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            try:
+                yield cursor
+            finally:
+                cursor.close()
 
 app = Flask(__name__)
 
@@ -29,69 +100,6 @@ DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 STATS_LIMIT = int(os.getenv('STATS_LIMIT', 1000))
 EXPORT_LIMIT = int(os.getenv('EXPORT_LIMIT', 5000))
 LIVE_METRICS_HOURS = int(os.getenv('LIVE_METRICS_HOURS', 1))
-
-# PostgreSQL connection pool
-postgres_pool = psycopg2.pool.ThreadedConnectionPool(
-    minconn=1,
-    maxconn=10,
-    host=POSTGRES_HOST,
-    port=POSTGRES_PORT,
-    database=POSTGRES_DB,
-    user=POSTGRES_USER,
-    password=POSTGRES_PASSWORD
-)
-
-
-def get_db_connection():
-    """Connection pool'dan bağlantı al"""
-    return postgres_pool.getconn()
-
-
-def release_db_connection(conn):
-    """Bağlantıyı pool'a geri ver"""
-    postgres_pool.putconn(conn)
-
-
-def execute_query(query: str, params: tuple = None, fetch_all: bool = True) -> List[Dict[str, Any]]:
-    """
-    PostgreSQL sorgusu çalıştırır
-    
-    Args:
-        query: SQL sorgusu
-        params: Sorgu parametreleri
-        fetch_all: Tüm sonuçları mı getir, yoksa tek mi
-    
-    Returns:
-        Sonuç listesi
-    """
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor(cursor_factory=RealDictCursor)
-        cursor.execute(query, params or ())
-        
-        if fetch_all:
-            result = cursor.fetchall()
-        else:
-            result = cursor.fetchone()
-        
-        cursor.close()
-        release_db_connection(conn)
-        
-        # Datetime objelerini string'e çevir
-        if isinstance(result, list):
-            for row in result:
-                for key, value in row.items():
-                    if isinstance(value, datetime):
-                        row[key] = value.isoformat()
-        elif result:
-            for key, value in result.items():
-                if isinstance(value, datetime):
-                    result[key] = value.isoformat()
-        
-        return result if fetch_all else ([result] if result else [])
-    except Exception as e:
-        print(f"Query hatası: {e}")
-        return []
 
 
 def calculate_stats() -> Dict[str, Any]:
@@ -253,7 +261,7 @@ def calculate_live_metrics() -> Dict[str, Any]:
         Canlı metrikler sözlüğü
     """
     try:
-        threshold_time = datetime.utcnow() - timedelta(hours=LIVE_METRICS_HOURS)
+        threshold_time = datetime.now(timezone.utc) - timedelta(hours=LIVE_METRICS_HOURS)
         
         # Son N saatteki logları al
         logs = execute_query(
@@ -342,52 +350,89 @@ def index():
 @app.route('/api/logs')
 def api_logs():
     """
-    Logları getir
+    Logları getir (UNION ALL ile optimize edilmiş)
     
     Query params:
         - level: 'INFO', 'ERROR' veya 'ALL' (varsayılan: 'ALL')
         - limit: Maksimum kayıt sayısı (varsayılan: 100)
+        - module: Modül filtresi (opsiyonel)
+        - search: Mesaj içinde arama (opsiyonel)
     """
     level = request.args.get('level', 'ALL').upper()
     limit = min(int(request.args.get('limit', 100)), 1000)
+    module = request.args.get('module')
+    search = request.args.get('search')
     
-    logs = []
+    # WHERE koşulları için parametreler
+    params = []
+    conditions = []
     
-    if level in ['ALL', 'INFO']:
-        logs.extend(execute_query(
-            """
-            SELECT 
-                timestamp, level, module, function_name, line_number, message
-            FROM application_logs
-            ORDER BY timestamp DESC
-            LIMIT %s
-            """,
-            (limit,)
-        ))
+    if module:
+        conditions.append("module = %s")
+        params.append(module)
     
-    if level in ['ALL', 'ERROR']:
-        logs.extend(execute_query(
-            """
-            SELECT 
-                timestamp, level, module, function_name, line_number, message
-            FROM error_logs
-            ORDER BY timestamp DESC
-            LIMIT %s
-            """,
-            (limit,)
-        ))
+    if search:
+        conditions.append("message LIKE %s")
+        params.append(f"%{search}%")
     
-    # Tarih sırasına göre sırala (yeniden eskiye)
-    logs.sort(key=lambda x: x['timestamp'], reverse=True)
+    where_clause = " AND " + " AND ".join(conditions) if conditions else ""
     
-    # Limit'i uygula
-    logs = logs[:limit]
-    
-    return jsonify({
-        'success': True,
-        'data': logs,
-        'count': len(logs)
-    })
+    try:
+        with get_db_cursor() as cursor:
+            if level == 'ALL':
+                # UNION ALL ile tek sorguda veri çek
+                query = f"""
+                    SELECT
+                        timestamp, level, module, function_name, line_number, message
+                    FROM application_logs
+                    WHERE timestamp >= NOW() - INTERVAL '7 days'{where_clause}
+                    UNION ALL
+                    SELECT
+                        timestamp, level, module, function_name, line_number, message
+                    FROM error_logs
+                    WHERE timestamp >= NOW() - INTERVAL '7 days'{where_clause}
+                    ORDER BY timestamp DESC
+                    LIMIT %s
+                """
+                params.append(limit)
+                cursor.execute(query, tuple(params))
+                logs = cursor.fetchall()
+            elif level == 'INFO':
+                query = f"""
+                    SELECT
+                        timestamp, level, module, function_name, line_number, message
+                    FROM application_logs
+                    WHERE timestamp >= NOW() - INTERVAL '7 days'{where_clause}
+                    ORDER BY timestamp DESC
+                    LIMIT %s
+                """
+                params.append(limit)
+                cursor.execute(query, tuple(params))
+                logs = cursor.fetchall()
+            else:  # ERROR
+                query = f"""
+                    SELECT
+                        timestamp, level, module, function_name, line_number, message
+                    FROM error_logs
+                    WHERE timestamp >= NOW() - INTERVAL '7 days'{where_clause}
+                    ORDER BY timestamp DESC
+                    LIMIT %s
+                """
+                params.append(limit)
+                cursor.execute(query, tuple(params))
+                logs = cursor.fetchall()
+        
+        return jsonify({
+            'success': True,
+            'data': logs,
+            'count': len(logs)
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'data': []
+        }), 500
 
 
 @app.route('/api/errors')
@@ -458,14 +503,15 @@ def api_requests():
     
     requests = execute_query(query, tuple(params))
     
-    # JSON alanlarını parse et
+    # JSONB alanları zaten dict olarak döner, parse gerekmez
+    # Ancak string olarak dönerse parse et
     for req in requests:
-        if req.get('headers'):
+        if req.get('headers') and isinstance(req.get('headers'), str):
             try:
                 req['headers'] = json.loads(req['headers'])
             except:
                 pass
-        if req.get('query_params'):
+        if req.get('query_params') and isinstance(req.get('query_params'), str):
             try:
                 req['query_params'] = json.loads(req['query_params'])
             except:
@@ -491,18 +537,30 @@ def api_stats():
 
 @app.route('/api/health')
 def api_health():
-    """Health check endpoint'i"""
+    """Gelişmiş health check endpoint'i"""
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute('SELECT 1')
-        cursor.close()
-        release_db_connection(conn)
+        with get_db_cursor() as cursor:
+            cursor.execute('SELECT 1')
+            
+        # Pool istatistiklerini al
+        pool_stats = get_pool_stats()
+        
+        # Log sayılarını al
+        total_logs = execute_query(
+            "SELECT COUNT(*) as count FROM application_logs"
+        )[0]['count']
+        
+        total_errors = execute_query(
+            "SELECT COUNT(*) as count FROM error_logs"
+        )[0]['count']
         
         return jsonify({
             'success': True,
             'status': 'healthy',
-            'postgres': 'connected'
+            'postgres': 'connected',
+            'pool_stats': pool_stats,
+            'total_logs': total_logs,
+            'total_errors': total_errors
         })
     except Exception as e:
         return jsonify({
@@ -794,7 +852,7 @@ def api_export_csv():
         
         # Başlık
         writer.writerow(['SB-Scrapper Analytics Export'])
-        writer.writerow([f'Export Date: {datetime.utcnow().isoformat()}'])
+        writer.writerow([f'Export Date: {datetime.now(timezone.utc).isoformat()}'])
         writer.writerow([])
         
         # Domain Stats
@@ -851,7 +909,7 @@ def api_export_csv():
             output.getvalue(),
             mimetype='text/csv',
             headers={
-                'Content-Disposition': f'attachment; filename=sb-scrapper-export-{datetime.utcnow().strftime("%Y%m%d-%H%M%S")}.csv'
+                'Content-Disposition': f'attachment; filename=sb-scrapper-export-{datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")}.csv'
             }
         )
     
@@ -859,6 +917,123 @@ def api_export_csv():
         return jsonify({
             'success': False,
             'error': 'CSV export sırasında hata oluştu'
+        }), 500
+
+
+@app.route('/api/logs/stream')
+def logs_stream():
+    """
+    Canlı log akışı için Polling tabanlı endpoint (SSE yerine)
+    Connection pool tükenmesini önlemek için polling kullanılır
+    
+    Query params:
+        - level: 'INFO', 'ERROR' veya 'ALL' (varsayılan: 'ALL')
+        - since: Son kontrol zamanı (timestamp string)
+    """
+    level = request.args.get('level', 'ALL').upper()
+    since_str = request.args.get('since')
+    
+    last_timestamp = datetime.now(timezone.utc) - timedelta(seconds=2)
+    
+    if since_str:
+        try:
+            last_timestamp = datetime.fromisoformat(since_str)
+        except:
+            pass
+    
+    try:
+        logs = []
+        
+        with get_db_cursor() as cursor:
+            if level == 'ALL':
+                cursor.execute("""
+                    SELECT
+                        timestamp, level, module, function_name, line_number, message
+                    FROM application_logs
+                    WHERE timestamp > %s
+                    ORDER BY timestamp DESC
+                    LIMIT 10
+                """, (last_timestamp,))
+                logs = cursor.fetchall()
+                
+                if not logs:
+                    cursor.execute("""
+                        SELECT
+                            timestamp, level, module, function_name, line_number, message
+                        FROM error_logs
+                        WHERE timestamp > %s
+                        ORDER BY timestamp DESC
+                        LIMIT 10
+                    """, (last_timestamp,))
+                    logs = cursor.fetchall()
+            elif level == 'INFO':
+                cursor.execute("""
+                    SELECT
+                        timestamp, level, module, function_name, line_number, message
+                    FROM application_logs
+                    WHERE timestamp > %s
+                    ORDER BY timestamp DESC
+                    LIMIT 10
+                """, (last_timestamp,))
+                logs = cursor.fetchall()
+            else:  # ERROR
+                cursor.execute("""
+                    SELECT
+                        timestamp, level, module, function_name, line_number, message
+                    FROM error_logs
+                    WHERE timestamp > %s
+                    ORDER BY timestamp DESC
+                    LIMIT 10
+                """, (last_timestamp,))
+                logs = cursor.fetchall()
+        
+        # Datetime objelerini string'e çevir
+        for log in logs:
+            if isinstance(log.get('timestamp'), datetime):
+                log['timestamp'] = log['timestamp'].isoformat()
+        
+        # En son timestamp'i döndür
+        next_since = datetime.now(timezone.utc).isoformat()
+        
+        return jsonify({
+            'success': True,
+            'data': logs,
+            'next_since': next_since
+        })
+    except Exception as e:
+        print(f"Log stream hatası: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'data': []
+        }), 500
+
+
+@app.route('/api/modules')
+def api_modules():
+    """
+    Mevcut modül listesini döndürür (filtreleme için)
+    """
+    try:
+        with get_db_cursor() as cursor:
+            cursor.execute("""
+                SELECT DISTINCT module
+                FROM application_logs
+                WHERE module IS NOT NULL AND module != ''
+                ORDER BY module
+            """)
+            modules = [row['module'] for row in cursor.fetchall()]
+        
+        return jsonify({
+            'success': True,
+            'data': modules,
+            'count': len(modules)
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'data': []
         }), 500
 
 

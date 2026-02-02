@@ -100,5 +100,29 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # Log Cleanup Job - Eski logları otomatik temizler
+  log-cleanup:
+    image: postgres:15-alpine
+    container_name: sb-log-cleanup
+    environment:
+      - POSTGRES_HOST=${POSTGRES_HOST:-postgres}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_DB=${POSTGRES_DB:-sb_scrapper}
+      - POSTGRES_USER=${POSTGRES_USER:-sb_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - CLEANUP_INTERVAL=${CLEANUP_INTERVAL:-86400}  # 24 saat (saniye cinsinden)
+    command: sh -c "export PGPASSWORD=$$POSTGRES_PASSWORD && while true; do echo '[$$(date)] Log cleanup başlatılıyor...' && psql -h $$POSTGRES_HOST -p $$POSTGRES_PORT -U $$POSTGRES_USER -d $$POSTGRES_DB -c 'SELECT * FROM cleanup_old_logs();' && echo '[$$(date)] Log cleanup tamamlandı. $$CLEANUP_INTERVAL saniye sonra tekrar çalışacak.' && sleep $$CLEANUP_INTERVAL; done"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    # Bu servis sadece periyodik çalışır, sürekli değil
+    # CPU kullanımı için limit koyabiliriz
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
 volumes:
   pg-data:

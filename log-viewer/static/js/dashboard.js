@@ -13,6 +13,11 @@ const CONFIG = {
 let currentLevel = 'ALL';
 let autoRefreshEnabled = true;
 let refreshTimer = null;
+let lastSince = null;  // Son kontrol zamanı
+
+// Filtre değişkenleri
+let currentModule = '';
+let currentSearch = '';
 
 // DOM elementleri
 const elements = {
@@ -33,7 +38,12 @@ const elements = {
     liveOperations: document.getElementById('liveOperations'),
     liveDuration: document.getElementById('liveDuration'),
     liveErrorRate: document.getElementById('liveErrorRate'),
-    liveTimeRange: document.getElementById('liveTimeRange')
+    liveTimeRange: document.getElementById('liveTimeRange'),
+    // Gelişmiş filtreler
+    moduleFilter: document.getElementById('moduleFilter'),
+    searchFilter: document.getElementById('searchFilter'),
+    applyFiltersBtn: document.getElementById('applyFiltersBtn'),
+    clearFiltersBtn: document.getElementById('clearFiltersBtn')
 };
 
 /**
@@ -55,9 +65,13 @@ async function fetchStats() {
 /**
  * Logları API'den çeker
  */
-async function fetchLogs(level = 'ALL', limit = CONFIG.defaultLimit) {
+async function fetchLogs(level = 'ALL', limit = CONFIG.defaultLimit, module = '', search = '') {
     try {
-        const response = await fetch(`${CONFIG.apiBaseUrl}/logs?level=${level}&limit=${limit}`);
+        let url = `${CONFIG.apiBaseUrl}/logs?level=${level}&limit=${limit}`;
+        if (module) url += `&module=${encodeURIComponent(module)}`;
+        if (search) url += `&search=${encodeURIComponent(search)}`;
+        
+        const response = await fetch(url);
         const result = await response.json();
         
         if (result.success) {
@@ -67,6 +81,121 @@ async function fetchLogs(level = 'ALL', limit = CONFIG.defaultLimit) {
     } catch (error) {
         console.error('Log çekme hatası:', error);
         showError('Loglar yüklenirken hata oluştu');
+    }
+}
+
+/**
+ * Polling ile canlı log akışı başlatır
+ */
+function startLiveUpdates() {
+    // Önceki timer'ı temizle
+    if (refreshTimer) {
+        clearInterval(refreshTimer);
+        refreshTimer = null;
+    }
+    
+    // Polling başlat
+    refreshTimer = setInterval(async () => {
+        await fetchNewLogs();
+    }, CONFIG.refreshInterval);
+}
+
+/**
+ * Canlı güncellemeleri durdurur
+ */
+function stopLiveUpdates() {
+    if (refreshTimer) {
+        clearInterval(refreshTimer);
+        refreshTimer = null;
+    }
+}
+
+/**
+ * Yeni logları çeker
+ */
+async function fetchNewLogs() {
+    if (!autoRefreshEnabled) return;
+    
+    try {
+        let url = `${CONFIG.apiBaseUrl}/logs/stream?level=${currentLevel}`;
+        if (lastSince) url += `&since=${encodeURIComponent(lastSince)}`;
+        
+        const response = await fetch(url);
+        const result = await response.json();
+        
+        if (result.success && result.data && result.data.length > 0) {
+            // Yeni logları tablonun başına ekle
+            result.data.forEach(log => {
+                prependLog(log);
+            });
+            
+            // Son timestamp'i güncelle
+            lastSince = result.next_since;
+        }
+    } catch (error) {
+        console.error('Yeni log çekme hatası:', error);
+    }
+}
+
+/**
+ * Tek logu tablonun başına ekler
+ */
+function prependLog(log) {
+    const row = createLogRow(log);
+    elements.logsTableBody.insertBefore(row, elements.logsTableBody.firstChild);
+    
+    // Çok fazla satır varsa eski olanları sil
+    const maxRows = CONFIG.defaultLimit;
+    while (elements.logsTableBody.children.length > maxRows) {
+        elements.logsTableBody.removeChild(elements.logsTableBody.lastChild);
+    }
+}
+
+/**
+ * Log satırı oluşturur
+ */
+function createLogRow(log) {
+    const levelClass = getLevelClass(log.level);
+    const timestamp = formatTimestamp(log.timestamp);
+    const location = log.module ? `${log.module}:${log.function_name || ''}:${log.line_number || ''}` : '-';
+    const message = escapeHtml(log.message || '');
+    
+    const tr = document.createElement('tr');
+    tr.className = 'fade-in';
+    tr.innerHTML = `
+        <td class="log-timestamp">${timestamp}</td>
+        <td><span class="${levelClass}">${log.level}</span></td>
+        <td class="log-location">${escapeHtml(location)}</td>
+        <td class="log-message" title="${message}">${message}</td>
+    `;
+    return tr;
+}
+
+/**
+ * Modül listesini yükler
+ */
+async function fetchModules() {
+    try {
+        const response = await fetch(`${CONFIG.apiBaseUrl}/modules`);
+        const result = await response.json();
+        
+        if (result.success && elements.moduleFilter) {
+            // Mevcut seçimi koru
+            const currentValue = elements.moduleFilter.value;
+            
+            elements.moduleFilter.innerHTML = '<option value="">Tümü</option>';
+            result.data.forEach(module => {
+                const option = document.createElement('option');
+                option.value = module;
+                option.textContent = module;
+                elements.moduleFilter.appendChild(option);
+            });
+            
+            // Seçimi geri yükle
+            elements.moduleFilter.value = currentValue;
+        }
+    } catch (error) {
+        console.error('Modül listesi çekme hatası:', error);
     }
 }
 
@@ -150,21 +279,10 @@ function renderLogs(logs) {
         return;
     }
     
-    elements.logsTableBody.innerHTML = logs.map(log => {
-        const levelClass = getLevelClass(log.level);
-        const timestamp = formatTimestamp(log.timestamp);
-        const location = log.location || '-';
-        const message = escapeHtml(log.message || '');
-        
-        return `
-            <tr class="fade-in">
-                <td class="log-timestamp">${timestamp}</td>
-                <td><span class="${levelClass}">${log.level}</span></td>
-                <td class="log-location">${escapeHtml(location)}</td>
-                <td class="log-message" title="${message}">${message}</td>
-            </tr>
-        `;
-    }).join('');
+    elements.logsTableBody.innerHTML = '';
+    logs.forEach(log => {
+        elements.logsTableBody.appendChild(createLogRow(log));
+    });
 }
 
 /**
@@ -258,14 +376,20 @@ function showError(message) {
  */
 function refreshAll() {
     fetchStats();
-    fetchLogs(currentLevel);
+    fetchLogs(currentLevel, CONFIG.defaultLimit, currentModule, currentSearch);
     fetchLiveMetrics();
+    fetchModules();
     
     // Refresh butonuna animasyon ekle
-    elements.refreshBtn.querySelector('i').classList.add('spin-animation');
-    setTimeout(() => {
-        elements.refreshBtn.querySelector('i').classList.remove('spin-animation');
-    }, 500);
+    if (elements.refreshBtn && elements.refreshBtn.querySelector) {
+        const icon = elements.refreshBtn.querySelector('i');
+        if (icon) {
+            icon.classList.add('spin-animation');
+            setTimeout(() => {
+                icon.classList.remove('spin-animation');
+            }, 500);
+        }
+    }
 }
 
 
@@ -276,12 +400,10 @@ function setAutoRefresh(enabled) {
     autoRefreshEnabled = enabled;
     
     if (enabled) {
-        refreshTimer = setInterval(refreshAll, CONFIG.refreshInterval);
+        // Polling kullan
+        startLiveUpdates();
     } else {
-        if (refreshTimer) {
-            clearInterval(refreshTimer);
-            refreshTimer = null;
-        }
+        stopLiveUpdates();
     }
 }
 
@@ -311,41 +433,96 @@ function toggleTheme() {
  */
 function setFilter(level) {
     currentLevel = level;
+    lastSince = null;  // Timestamp'i sıfırla
     
     // Buton durumlarını güncelle
     [elements.filterAll, elements.filterInfo, elements.filterError].forEach(btn => {
-        btn.classList.remove('active');
+        if (btn) btn.classList.remove('active');
     });
     
-    if (level === 'ALL') elements.filterAll.classList.add('active');
-    else if (level === 'INFO') elements.filterInfo.classList.add('active');
-    else if (level === 'ERROR') elements.filterError.classList.add('active');
+    if (level === 'ALL' && elements.filterAll) elements.filterAll.classList.add('active');
+    else if (level === 'INFO' && elements.filterInfo) elements.filterInfo.classList.add('active');
+    else if (level === 'ERROR' && elements.filterError) elements.filterError.classList.add('active');
     
     // Logları yenile
-    fetchLogs(level);
+    fetchLogs(level, CONFIG.defaultLimit, currentModule, currentSearch);
+}
+
+/**
+ * Gelişmiş filtreleri uygular
+ */
+function applyFilters() {
+    if (elements.moduleFilter) {
+        currentModule = elements.moduleFilter.value;
+    }
+    if (elements.searchFilter) {
+        currentSearch = elements.searchFilter.value.trim();
+    }
+    lastSince = null;  // Timestamp'i sıfırla
+    
+    // Logları yenile
+    fetchLogs(currentLevel, CONFIG.defaultLimit, currentModule, currentSearch);
+}
+
+/**
+ * Filtreleri temizler
+ */
+function clearFilters() {
+    currentModule = '';
+    currentSearch = '';
+    lastSince = null;  // Timestamp'i sıfırla
+    
+    if (elements.moduleFilter) elements.moduleFilter.value = '';
+    if (elements.searchFilter) elements.searchFilter.value = '';
+    
+    // Logları yenile
+    fetchLogs(currentLevel, CONFIG.defaultLimit, currentModule, currentSearch);
 }
 /**
  * Event listeners
  */
 function initEventListeners() {
     // Auto refresh toggle
-    elements.autoRefreshToggle.addEventListener('change', (e) => {
-        setAutoRefresh(e.target.checked);
-    });
+    if (elements.autoRefreshToggle) {
+        elements.autoRefreshToggle.addEventListener('change', (e) => {
+            setAutoRefresh(e.target.checked);
+        });
+    }
     
     // Theme toggle
-    elements.themeToggle.addEventListener('click', toggleTheme);
+    if (elements.themeToggle) {
+        elements.themeToggle.addEventListener('click', toggleTheme);
+    }
     
     // Refresh button
-    elements.refreshBtn.addEventListener('click', refreshAll);
+    if (elements.refreshBtn) {
+        elements.refreshBtn.addEventListener('click', refreshAll);
+    }
     
     // Export CSV button
-    elements.exportCsvBtn.addEventListener('click', exportCsv);
+    if (elements.exportCsvBtn) {
+        elements.exportCsvBtn.addEventListener('click', exportCsv);
+    }
     
     // Filter buttons
-    elements.filterAll.addEventListener('click', () => setFilter('ALL'));
-    elements.filterInfo.addEventListener('click', () => setFilter('INFO'));
-    elements.filterError.addEventListener('click', () => setFilter('ERROR'));
+    if (elements.filterAll) elements.filterAll.addEventListener('click', () => setFilter('ALL'));
+    if (elements.filterInfo) elements.filterInfo.addEventListener('click', () => setFilter('INFO'));
+    if (elements.filterError) elements.filterError.addEventListener('click', () => setFilter('ERROR'));
+    
+    // Gelişmiş filtreler
+    if (elements.applyFiltersBtn) {
+        elements.applyFiltersBtn.addEventListener('click', applyFilters);
+    }
+    if (elements.clearFiltersBtn) {
+        elements.clearFiltersBtn.addEventListener('click', clearFilters);
+    }
+    if (elements.searchFilter) {
+        elements.searchFilter.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                applyFilters();
+            }
+        });
+    }
 }
 
 
@@ -355,11 +532,15 @@ function initEventListeners() {
 function init() {
     initEventListeners();
     refreshAll();
+    fetchModules();
     setAutoRefresh(true);
 }
 
 // Sayfa yüklendiğinde başlat
 document.addEventListener('DOMContentLoaded', init);
+
+// Sayfa kapatılırken SSE bağlantısını kapat
+window.addEventListener('beforeunload', stopLiveUpdates);
 
 // Spin animasyonu için CSS
 const style = document.createElement('style');
