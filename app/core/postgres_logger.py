@@ -174,8 +174,11 @@ class PostgresHandler:
             self._queue.put_nowait(message)
         except queue.Full:
             # Memory leak önlemek için kuyruk dolarsa log atlanır
+            # Geliştirilmiş uyarı mekanizması - queue durumunu logla
             import sys
-            print(f"⚠️ PostgreSQL log kuyruğu dolu (maxsize=10000), log atlanıyor!", file=sys.stderr)
+            queue_size = self._queue.qsize()
+            print(f"⚠️ PostgreSQL log kuyruğu dolu (maxsize=10000, current={queue_size}), log atlanıyor!", file=sys.stderr)
+            logger.warning(f"PostgreSQL log kuyruğu dolu (maxsize=10000, current={queue_size}), log atlanıyor!")
     
     async def _get_pool(self):
         """Connection pool'u al"""
@@ -247,7 +250,7 @@ class PostgresHandler:
     def stop_consumer(self):
         """
         Consumer thread'ini güvenli şekilde durdur
-        Thread-safe cleanup mekanizması
+        Thread-safe cleanup mekanizması - Event leak önlemek için
         """
         with self._cleanup_lock:
             if not self._consumer_loop_running:
@@ -263,7 +266,30 @@ class PostgresHandler:
             
             # Thread'in bitmesini bekle
             if self._consumer_thread and self._consumer_thread.is_alive():
-                self._consumer_thread.join(timeout=5)
+                self._consumer_thread.join(timeout=10)
+            
+            # Event loop'u temizle - Thread-local storage'dan
+            try:
+                loop = asyncio.get_event_loop()
+                if loop and not loop.is_closed():
+                    # Tüm pending task'ları iptal et
+                    pending = asyncio.all_tasks(loop)
+                    for task in pending:
+                        task.cancel()
+                    
+                    # Task'ların bitmesini bekle
+                    if pending:
+                        try:
+                            loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                        except Exception:
+                            pass
+                    
+                    loop.close()
+                
+                # Thread-local event loop'u temizle
+                asyncio.set_event_loop(None)
+            except Exception:
+                pass
     
     def __del__(self):
         """

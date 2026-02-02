@@ -19,16 +19,24 @@ from loguru import logger
 _thread_local = threading.local()
 
 
-def _get_event_loop():
-    """Thread-local event loop al veya oluştur"""
+def _get_event_loop() -> asyncio.AbstractEventLoop:
+    """Thread-local event loop al veya oluştur
+    
+    Returns:
+        asyncio.AbstractEventLoop: Thread-local event loop
+    """
     if not hasattr(_thread_local, 'loop'):
         _thread_local.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(_thread_local.loop)
     return _thread_local.loop
 
 
-def _cleanup_event_loop():
-    """Thread-local event loop'u temizle"""
+def _cleanup_event_loop() -> None:
+    """Thread-local event loop'u temizle
+    
+    Returns:
+        None
+    """
     if hasattr(_thread_local, 'loop') and _thread_local.loop:
         try:
             # Önce tüm pending task'ları iptal et
@@ -168,7 +176,10 @@ class AsyncTaskQueue:
             logger.info(f"✅ AsyncTaskQueue başlatıldı ({worker_count} worker)")
     
     def stop(self) -> None:
-        """Worker thread'leri durdur"""
+        """
+        Worker thread'leri durdur
+        Event leak önlemek için tüm worker thread'lerinin event loop'ları temizlenir
+        """
         with self._task_lock:
             if not self._running:
                 return
@@ -181,9 +192,35 @@ class AsyncTaskQueue:
             
             # Worker thread'lerinin bitmesini bekle
             for worker in self._workers:
-                worker.join(timeout=5)
+                worker.join(timeout=10)
             
             self._workers.clear()
+            
+            # Tüm thread-local event loop'ları temizle
+            # Her worker kendi event loop'unu temizlemeli ama garanti için ek kontrol
+            try:
+                # Ana thread'de kalan event loop'u temizle
+                loop = asyncio.get_event_loop()
+                if loop and not loop.is_closed():
+                    # Tüm pending task'ları iptal et
+                    pending = asyncio.all_tasks(loop)
+                    for task in pending:
+                        task.cancel()
+                    
+                    # Task'ların bitmesini bekle
+                    if pending:
+                        try:
+                            loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                        except Exception:
+                            pass
+                    
+                    loop.close()
+                
+                # Thread-local event loop'u temizle
+                asyncio.set_event_loop(None)
+            except Exception:
+                pass
+            
             logger.info("🔌 AsyncTaskQueue durduruldu")
     
     def _worker_loop(self) -> None:

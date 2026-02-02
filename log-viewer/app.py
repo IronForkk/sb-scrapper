@@ -44,13 +44,13 @@ except ImportError:
         postgres_pool.putconn(conn)
     
     def execute_query(query: str, params: tuple = None, fetch_all: bool = True) -> list:
+        conn = None
+        cursor = None
         try:
             conn = get_db_connection()
             cursor = conn.cursor(cursor_factory=RealDictCursor)
             cursor.execute(query, params or ())
             result = cursor.fetchall() if fetch_all else cursor.fetchone()
-            cursor.close()
-            release_db_connection(conn)
             
             if isinstance(result, list):
                 for row in result:
@@ -66,6 +66,18 @@ except ImportError:
         except Exception as e:
             print(f"Query hatası: {e}")
             return []
+        finally:
+            # Connection'ı her durumda temizle (connection leak önlemek için)
+            if cursor:
+                try:
+                    cursor.close()
+                except Exception:
+                    pass
+            if conn:
+                try:
+                    release_db_connection(conn)
+                except Exception:
+                    pass
     
     def get_pool_stats() -> dict:
         try:

@@ -33,15 +33,14 @@ except ImportError:
 
 from app.config import settings
 from app.core.logger import logger
-from app.core.blacklist import BlacklistManager
 from app.payloads.noise_js import get_consistent_noise_js
 from app.payloads.sentinel_js import JS_SENTINEL
 from app.schemas import ScrapeRequest, ScrapeResponse
 from app.utils.user_agents import get_random_user_agent
 
 
-# Black-List Manager Singleton
-blacklist_mgr = BlacklistManager(settings.blacklist_file)
+# Black-List Manager - Global instance from blacklist module
+from app.core.blacklist import blacklist_manager as blacklist_mgr
 logger.info(f"🚫 Black-list yüklendi: {blacklist_mgr.get_blacklist_count()} domain")
 
 
@@ -54,6 +53,7 @@ class BrowserManager:
     _instance = None
     _class_lock = threading.Lock()
     _initialized = False  # Sınıf seviyesinde initialized bayrağı
+    _init_lock = threading.Lock()  # __init__ için ek lock
     
     def __new__(cls):
         """Thread-safe singleton pattern (Double-Checked Locking)"""
@@ -66,25 +66,33 @@ class BrowserManager:
 
     def __init__(self):
         # Thread-safe singleton - sadece bir kez çalışmalı
+        # Double-checked locking pattern ile race condition önlenir
         if BrowserManager._initialized:
             return
-        with BrowserManager._class_lock:
+        
+        # İlk kontrol lock olmadan (performance için)
+        with BrowserManager._init_lock:
+            # İkinci kontrol lock ile (thread-safety için)
             if BrowserManager._initialized:
                 return
+            
+            # Tüm initialization işlemleri bu lock altında yapılır
+            self.driver = None
+            self.lock = threading.Lock()
+            
+            # Rastgele noise değerleri (her oturum için tutarlı) - Config'den okunur
+            self.noise_r = random.randint(settings.noise_min_value, settings.noise_max_value)
+            self.noise_g = random.randint(settings.noise_min_value, settings.noise_max_value)
+            self.noise_b = random.randint(settings.noise_min_value, settings.noise_max_value)
+            
+            # Rastgele User Agent
+            self.user_agent = get_random_user_agent(platform=settings.user_agent_platform)
+            
+            # Son olarak initialized bayrağını ayarla
             BrowserManager._initialized = True
-        
-        self.driver = None
-        self.lock = threading.Lock()
-        
-        # Rastgele noise değerleri (her oturum için tutarlı) - Config'den okunur
-        self.noise_r = random.randint(settings.noise_min_value, settings.noise_max_value)
-        self.noise_g = random.randint(settings.noise_min_value, settings.noise_max_value)
-        self.noise_b = random.randint(settings.noise_min_value, settings.noise_max_value)
-        
-        # Rastgele User Agent
-        self.user_agent = get_random_user_agent(platform=settings.user_agent_platform)
-        
-        self.start_driver()
+            
+            # Driver'ı başlat (initialized'dan sonra)
+            self.start_driver()
 
     def _kill_chrome_processes(self) -> None:
         """

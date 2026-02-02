@@ -3,7 +3,8 @@ Konfigürasyon Yönetimi
 Ayarları .env dosyasından okur
 """
 from pydantic_settings import BaseSettings
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, ValidationError
+import sys
 
 
 class Settings(BaseSettings):
@@ -63,7 +64,22 @@ class Settings(BaseSettings):
     # Request Log Sınırlamaları
     max_request_body_size: int = Field(default=10240, alias="MAX_REQUEST_BODY_SIZE")  # 10KB
     sensitive_headers: list[str] = Field(
-        default=["authorization", "cookie", "x-api-key", "token"],
+        default=[
+            # Authentication headers
+            "authorization", "proxy-authorization", "www-authenticate",
+            # Cookie headers
+            "cookie", "set-cookie", "cookie2",
+            # API key headers
+            "x-api-key", "x-auth-token", "x-access-token", "x-secret",
+            # Token headers
+            "token", "access-token", "refresh-token", "auth-token",
+            # Session headers
+            "session-id", "session-token", "session-key",
+            # Security headers
+            "csrf-token", "x-csrf-token", "x-xsrf-token",
+            # Other sensitive headers
+            "password", "passwd", "secret", "private-key"
+        ],
         alias="SENSITIVE_HEADERS"
     )
     
@@ -195,4 +211,19 @@ class Settings(BaseSettings):
     }
 
 
-settings = Settings()
+# Settings instance'ını oluştur ve validation hatalarını yakala
+try:
+    settings = Settings()
+except ValidationError as e:
+    print("❌ Konfigürasyon hatası tespit edildi!", file=sys.stderr)
+    print("\nDetaylı hata bilgisi:", file=sys.stderr)
+    for error in e.errors():
+        field = " -> ".join(str(loc) for loc in error["loc"])
+        message = error["msg"]
+        print(f"  - {field}: {message}", file=sys.stderr)
+    print("\nLütfen .env dosyanızı kontrol edin ve düzeltin.", file=sys.stderr)
+    print("Daha fazla bilgi için .env.example dosyasına bakabilirsiniz.", file=sys.stderr)
+    sys.exit(1)
+except Exception as e:
+    print(f"❌ Beklenmeyen konfigürasyon hatası: {e}", file=sys.stderr)
+    sys.exit(1)

@@ -6,6 +6,7 @@ from typing import Dict, Any, Optional, Callable
 from functools import wraps
 import hashlib
 import time
+import threading
 from fastapi import FastAPI, HTTPException, APIRouter, Request, Response, Header, Depends, status
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -249,10 +250,11 @@ async def postgres_health_check_middleware(request: Request, call_next: Any) -> 
 # ==================== RESPONSE CACHING (Opsiyonel) ====================
 class SimpleCache:
     """
-    Basit in-memory cache (LRU benzeri)
+    Basit in-memory cache (LRU benzeri) - Thread-safe
     
     Cache, TTL (Time To Live) süresi boyunca verileri tutar.
     TTL süresi dolan kayıtlar otomatik olarak silinir.
+    Thread-safe: Tüm işlemler lock ile korunur.
     """
     def __init__(self, max_size: int = 100, ttl: int = 300):
         """
@@ -265,6 +267,7 @@ class SimpleCache:
         self._cache: Dict[str, tuple] = {}
         self._max_size = max_size
         self._ttl = ttl
+        self._lock = threading.Lock()  # Thread-safety için lock
 
     def get(self, key: str) -> Optional[Any]:
         """
@@ -276,11 +279,12 @@ class SimpleCache:
         Returns:
             Cache'teki veri veya None
         """
-        if key in self._cache:
-            data, timestamp = self._cache[key]
-            if time.time() - timestamp < self._ttl:
-                return data
-            del self._cache[key]
+        with self._lock:
+            if key in self._cache:
+                data, timestamp = self._cache[key]
+                if time.time() - timestamp < self._ttl:
+                    return data
+                del self._cache[key]
         return None
 
     def set(self, key: str, value: Any) -> None:
@@ -291,15 +295,17 @@ class SimpleCache:
             key: Cache anahtarı
             value: Cache'e yazılacak veri
         """
-        if len(self._cache) >= self._max_size:
-            # En eski kaydı sil
-            oldest_key = min(self._cache.keys(), key=lambda k: self._cache[k][1])
-            del self._cache[oldest_key]
-        self._cache[key] = (value, time.time())
+        with self._lock:
+            if len(self._cache) >= self._max_size:
+                # En eski kaydı sil
+                oldest_key = min(self._cache.keys(), key=lambda k: self._cache[k][1])
+                del self._cache[oldest_key]
+            self._cache[key] = (value, time.time())
 
     def clear(self) -> None:
         """Cache'i temizle"""
-        self._cache.clear()
+        with self._lock:
+            self._cache.clear()
 
 
 # Global cache instance
@@ -341,6 +347,118 @@ def cache_response(ttl: int = 300):
             return result
         return wrapper
     return decorator
+
+
+# ==================== HEALTH CHECK ENDPOINT ====================
+@app.get("/health")
+async def health_check() -> Dict[str, Any]:
+    """
+    Kapsamlı health check endpoint
+    
+    Tüm servislerin durumunu kontrol eder:
+    - PostgreSQL bağlantısı
+    - Browser Manager (Chrome driver)
+    - Task Queue
+    - Memory Monitor
+    - System Monitor
+    - Cache
+    
+    Returns:
+        Dict[str, Any]: Sağlık durumu bilgileri
+    """
+    health_status = {
+        "status": "healthy",
+        "timestamp": time.time(),
+        "services": {}
+    }
+    
+    # PostgreSQL bağlantısı kontrolü
+    try:
+        from app.db.connection import connection_pool
+        pg_healthy = await postgres_logger.health_check()
+        health_status["services"]["postgresql"] = {
+            "status": "healthy" if pg_healthy else "unhealthy",
+            "pool_initialized": connection_pool._initialized if hasattr(connection_pool, '_initialized') else False
+        }
+    except Exception as e:
+        health_status["services"]["postgresql"] = {
+            "status": "unhealthy",
+            "error": str(e)
+        }
+        health_status["status"] = "degraded"
+    
+    # Browser Manager kontrolü
+    try:
+        browser_healthy = mgr.driver is not None
+        health_status["services"]["browser"] = {
+            "status": "healthy" if browser_healthy else "unhealthy",
+            "driver_available": browser_healthy
+        }
+    except Exception as e:
+        health_status["services"]["browser"] = {
+            "status": "unhealthy",
+            "error": str(e)
+        }
+        health_status["status"] = "degraded"
+    
+    # Task Queue kontrolü
+    try:
+        queue_stats = task_queue.get_stats()
+        health_status["services"]["task_queue"] = {
+            "status": "healthy",
+            "running": queue_stats["running"],
+            "queue_size": queue_stats["queue_size"],
+            "worker_count": queue_stats["worker_count"]
+        }
+    except Exception as e:
+        health_status["services"]["task_queue"] = {
+            "status": "unhealthy",
+            "error": str(e)
+        }
+        health_status["status"] = "degraded"
+    
+    # Memory Monitor kontrolü
+    try:
+        memory_monitor = get_memory_monitor()
+        health_status["services"]["memory_monitor"] = {
+            "status": "healthy",
+            "running": memory_monitor._running if hasattr(memory_monitor, '_running') else False
+        }
+    except Exception as e:
+        health_status["services"]["memory_monitor"] = {
+            "status": "unhealthy",
+            "error": str(e)
+        }
+        health_status["status"] = "degraded"
+    
+    # System Monitor kontrolü
+    try:
+        system_monitor = get_system_monitor()
+        health_status["services"]["system_monitor"] = {
+            "status": "healthy",
+            "running": system_monitor._running if hasattr(system_monitor, '_running') else False
+        }
+    except Exception as e:
+        health_status["services"]["system_monitor"] = {
+            "status": "unhealthy",
+            "error": str(e)
+        }
+        health_status["status"] = "degraded"
+    
+    # Cache kontrolü
+    try:
+        health_status["services"]["cache"] = {
+            "status": "healthy",
+            "enabled": settings.response_caching_enabled
+        }
+    except Exception as e:
+        health_status["services"]["cache"] = {
+            "status": "unhealthy",
+            "error": str(e)
+        }
+        health_status["status"] = "degraded"
+    
+    return health_status
 
 
 # Browser Manager (Singleton)
@@ -404,12 +522,15 @@ async def startup_event() -> None:
 @app.on_event("shutdown")
 async def shutdown_event() -> None:
     """
-    Uygulama kapanırken PostgreSQL bağlantısını kapat ve task queue'yi durdur
+    Uygulama kapanırken tüm kaynakları güvenli şekilde serbest bırak
+    Graceful shutdown - tüm servisler düzgün şekilde durdurulur
     
     Raises:
-        Exception: PostgreSQL bağlantı kapatma hatası
+        Exception: Kaynak kapatma hatası
     """
-    # Memory Monitor'ü durdur
+    logger.info("🔄 Graceful shutdown başlatılıyor...")
+    
+    # 1. Memory Monitor'ü durdur
     try:
         memory_monitor = get_memory_monitor()
         memory_monitor.stop()
@@ -417,7 +538,7 @@ async def shutdown_event() -> None:
     except Exception as e:
         logger.error(f"❌ Memory Monitor durdurma hatası: {e}")
     
-    # System Monitor'ü durdur
+    # 2. System Monitor'ü durdur
     try:
         system_monitor = get_system_monitor()
         system_monitor.stop()
@@ -425,21 +546,54 @@ async def shutdown_event() -> None:
     except Exception as e:
         logger.error(f"❌ System Monitor durdurma hatası: {e}")
     
-    # Task Queue'yi durdur
+    # 3. Task Queue'yi durdur (önce kuyruğu boşalt)
     try:
+        # Kuyrukta bekleyen task'ların bitmesini bekle
+        import asyncio
+        max_wait_seconds = 30
+        waited = 0
+        while task_queue.get_queue_size() > 0 and waited < max_wait_seconds:
+            await asyncio.sleep(1)
+            waited += 1
+        
+        if waited >= max_wait_seconds:
+            logger.warning(f"⚠️ Task queue timeout: {task_queue.get_queue_size()} task bekliyor")
+        
         task_queue.stop()
         logger.info("🔌 Task Queue durduruldu.")
     except Exception as e:
         logger.error(f"❌ Task Queue durdurma hatası: {e}")
     
-    # PostgreSQL bağlantısını kapat
+    # 4. Browser Manager'ı temizle
+    try:
+        mgr.cleanup_temp_files()
+        logger.info("🔌 Browser Manager temizlendi.")
+    except Exception as e:
+        logger.error(f"❌ Browser Manager temizleme hatası: {e}")
+    
+    # 5. PostgreSQL bağlantısını kapat
     from app.db.connection import connection_pool
+    from app.core.postgres_logger import postgres_handler
     
     try:
+        # Önce postgres handler'ı durdur
+        postgres_handler.stop_consumer()
+        logger.info("🔌 PostgreSQL Handler durduruldu.")
+        
+        # Sonra connection pool'ı kapat
         await connection_pool.close()
         logger.info("🔌 PostgreSQL bağlantısı kapatıldı.")
     except Exception as e:
         logger.error(f"❌ PostgreSQL bağlantı kapatma hatası: {e}")
+    
+    # 6. Cache'i temizle
+    try:
+        response_cache.clear()
+        logger.info("🔌 Response cache temizlendi.")
+    except Exception as e:
+        logger.error(f"❌ Cache temizleme hatası: {e}")
+    
+    logger.info("✅ Graceful shutdown tamamlandı.")
 
 # ==================== LOG ROUTER ====================
 log_router = APIRouter(prefix="/api", tags=["Loglar"])

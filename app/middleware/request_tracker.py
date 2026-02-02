@@ -11,6 +11,13 @@ from app.config import settings
 from app.core.postgres_logger import postgres_logger
 
 
+# HTTP method constants
+HTTP_METHODS_WITH_BODY = ("POST", "PUT", "PATCH")
+FILTERED_HEADER_VALUE = "***FILTERED***"
+TRUNCATED_BODY_SUFFIX = "... [TRUNCATED]"
+BODY_ERROR_MESSAGE = "Body okunamadı"
+
+
 def _filter_sensitive_headers(headers: Dict[str, str]) -> Dict[str, str]:
     """
     Hassas header'ları filtrele
@@ -28,7 +35,7 @@ def _filter_sensitive_headers(headers: Dict[str, str]) -> Dict[str, str]:
         if key.lower() not in sensitive_lower:
             filtered[key] = value
         else:
-            filtered[key] = "***FILTERED***"
+            filtered[key] = FILTERED_HEADER_VALUE
     
     return filtered
 
@@ -50,7 +57,7 @@ def _truncate_body(body: Any, max_size: int) -> Any:
     body_str = json.dumps(body) if isinstance(body, (dict, list)) else str(body)
     
     if len(body_str) > max_size:
-        return body_str[:max_size] + "... [TRUNCATED]"
+        return body_str[:max_size] + TRUNCATED_BODY_SUFFIX
     
     return body
 
@@ -112,7 +119,7 @@ async def request_tracker_middleware(request: Request, call_next: Any) -> Respon
     
     # Request body logla (POST/PUT/PATCH için)
     # Body cache'leme: request.state'de sakla (endpoint'te tekrar okunabilsin)
-    if settings.log_request_body and request.method in ["POST", "PUT", "PATCH"]:
+    if settings.log_request_body and request.method in HTTP_METHODS_WITH_BODY:
         try:
             # Body'yi oku ve cache'le
             body = await request.body()
@@ -131,21 +138,22 @@ async def request_tracker_middleware(request: Request, call_next: Any) -> Respon
                     request_data["body"] = _truncate_body(body_str, settings.max_request_body_size)
         except Exception as e:
             # Body okunamazsa hata logla ama devam et
-            request_data["body_error"] = "Body okunamadı"
+            request_data["body_error"] = BODY_ERROR_MESSAGE
     
     # İsteği işle
-    response = await call_next(request)
-    
-    # Response bilgilerini ekle
-    request_data["response_status_code"] = response.status_code
-    request_data["response_time_ms"] = int((time.time() - start_time) * 1000)
-    
-    # İsteği PostgreSQL'e logla (async olarak)
-    await postgres_logger.log_request(request_data)
-    
-    # Cache'i temizle - Memory leak önlemek için
-    if hasattr(request.state, '_cached_body'):
-        delattr(request.state, '_cached_body')
+    try:
+        response = await call_next(request)
+        
+        # Response bilgilerini ekle
+        request_data["response_status_code"] = response.status_code
+        request_data["response_time_ms"] = int((time.time() - start_time) * 1000)
+        
+        # İsteği PostgreSQL'e logla (async olarak)
+        await postgres_logger.log_request(request_data)
+    finally:
+        # Cache'i temizle - Memory leak önlemek için (exception durumunda da çalışır)
+        if hasattr(request.state, '_cached_body'):
+            delattr(request.state, '_cached_body')
     
     return response
 
