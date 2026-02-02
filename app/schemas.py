@@ -121,7 +121,11 @@ class ScrapeRequest(BaseModel):
     @field_validator('url')
     @classmethod
     def validate_url(cls, v: str) -> str:
-        """URL validasyonu - Geliştirilmiş versiyon (Hata #6 düzeltmesi)"""
+        """
+        URL validasyonu - Geliştirilmiş versiyon (Hata #6 düzeltmesi)
+        
+        SSRF (Server-Side Request Forgery) koruması dahildir.
+        """
         if not v:
             raise ValueError('URL boş olamaz')
         v = v.strip()
@@ -136,6 +140,26 @@ class ScrapeRequest(BaseModel):
         # Protokol kontrolü
         if parsed.scheme not in ('http', 'https'):
             raise ValueError('Sadece HTTP ve HTTPS protokolleri desteklenir')
+        
+        # SSRF koruması - localhost, 127.0.0.1, 0.0.0.0, ::1 gibi özel IP'leri engelle
+        hostname = parsed.netloc.split(':')[0].lower()
+        blocked_hosts = [
+            'localhost', '127.0.0.1', '0.0.0.0', '::1',
+            '169.254.169.254',  # Link-local
+            '[::1]', '[::ffff:7f00:1]'  # IPv6 localhost
+        ]
+        
+        if hostname in blocked_hosts:
+            raise ValueError(f'Geçersiz URL: {hostname} engellenmiş')
+        
+        # Özel IP aralıklarını kontrol et (private IP'ler)
+        import ipaddress
+        try:
+            ip = ipaddress.ip_address(hostname)
+            if ip.is_private:
+                raise ValueError(f'Geçersiz URL: Özel IP adresi engellenmiş')
+        except ValueError:
+            pass  # IP değilse, domain olarak kabul et
         
         return v
     

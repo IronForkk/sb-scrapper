@@ -52,4 +52,11 @@ test_blacklist.py
 tester.py
 analiz_et.pys
 canli_test_sonuclari/*
+test_ciktilari/*
 plans/*
+
+
+#data
+pg-data/
+python-mem.md
+plans/

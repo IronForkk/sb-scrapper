@@ -7,7 +7,7 @@ ENV PYTHONUNBUFFERED=1
 ENV PYTHONIOENCODING=UTF-8
 
 # Locale Configuration (Türkçe Ayarları)
-RUN apt-get update && apt-get install -y --no-install-recommends tzdata locales && \
+RUN apt-get update && apt-get install -y --no-install-recommends tzdata locales htop procps && \
     sed -i '/tr_TR.UTF-8/s/^# //g' /etc/locale.gen && locale-gen && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 ENV TZ=Turkey/Istanbul
@@ -40,10 +40,21 @@ RUN wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd6
     rm ./google-chrome-stable_current_amd64.deb && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Install Python
+# Install Python 3.11 via deadsnakes PPA
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 python3-pip python3-setuptools python3-dev python3-tk && \
+    software-properties-common gnupg2 && \
+    apt-key adv --keyserver keyserver.ubuntu.com --recv-keys F23C5A6CF475977595C89F51BA6932366A755776 && \
+    add-apt-repository ppa:deadsnakes/ppa -y && \
+    apt-get update && apt-get install -y --no-install-recommends \
+    python3.11 python3.11-venv python3.11-dev python3-distutils && \
+    curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
+    python3.11 get-pip.py && \
+    rm get-pip.py && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Python 3.11'i varsayılan python3 yap
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 && \
+    update-alternatives --install /usr/bin/pip3 pip3 /usr/local/bin/pip3 1
 
 # ==========================================
 # Stage 2: Python Dependencies
@@ -91,5 +102,8 @@ ENV WAIT_TIME=8
 ENV LOG_LEVEL=INFO
 
 # Konteyner başladığında API'yi çalıştır
-# CMD ["python3", "-m", "app.main"]
 CMD ["gunicorn", "app.main:app", "-w", "1", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000", "--max-requests", "1000", "--max-requests-jitter", "50", "--timeout", "300"]
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1

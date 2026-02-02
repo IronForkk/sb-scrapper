@@ -1,578 +1,793 @@
-# SB-Scraper
+<div align="center">
 
-![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)
-![Python](https://img.shields.io/badge/python-3.9+-green.svg)
-![License](https://img.shields.io/badge/license-MIT-orange.svg)
+# 🕷️ SB-Scraper
 
-SeleniumBase tabanlı, gelişmiş anti-detection özelliklerine sahip web scraping API'si. Modern web sitelerini taramak, ekran görüntüsü almak, HTML kaynak kodlarını toplamak ve arama motoru sonuçlarını analiz etmek için tasarlanmıştır.
+### Profesyonel Web Scraping API Platformu
+
+[![Python](https://img.shields.io/badge/Python-3.11-blue)](https://www.python.org/downloads/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.109.0-green)](https://fastapi.tiangolo.com/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-blue)](https://www.postgresql.org/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-blue)](https://www.docker.com/)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+**Anti-Bot Detection Bypass | Canvas Fingerprinting Noise | Advanced Popup Removal | Request Logging | Real-time Monitoring**
+
+</div>
+
+---
 
 ## 📋 İçindekiler
 
-- [Özellikler](#-özellikler)
-- [Teknik Mimari](#-teknik-mimari)
-- [Kurulum](#-kurulum)
-- [Docker ile Çalıştırma](#-docker-ile-çalıştırma)
-- [Kullanım](#-kullanım)
-- [API Dokümantasyonu](#-api-dokümantasyonu)
-- [Konfigürasyon](#-konfigürasyon)
-- [Proje Yapısı](#-proje-yapısı)
-- [Sık Karşılaşılan Sorular](#-sık-karşılaşılan-sorular)
+- [🎯 Proje Hakkında](#-proje-hakkında)
+- [✨ Özellikler](#-özellikler)
+- [🏗️ Mimari](#-mimari)
+- [🛠️ Teknoloji Yığını](#️-teknoloji-yığını)
+- [📦 Kurulum](#-kurulum)
+- [🚀 Kullanım](#-kullanım)
+- [📊 API Dokümantasyonu](#-api-dokümantasyonu)
+- [🔧 Konfigürasyon](#-konfigürasyon)
+- [📈 Log Viewer](#-log-viewer)
+- [🐳 Docker](#-docker)
+- [📂 Proje Yapısı](#-proje-yapısı)
+- [🔒 Güvenlik](#-güvenlik)
+
+---
+
+## 🎯 Proje Hakkında
+
+**SB-Scraper**, SeleniumBase tabanlı, anti-bot detection bypass yetenekleri olan profesyonel bir web scraping API platformudur. Modern web sitelerini tarayarak HTML kaynak kodu, ekran görüntüsü ve arama motoru sonuçlarını toplar.
+
+### Neden SB-Scraper?
+
+Günümüzde web siteleri, botları tespit etmek için çeşitli yöntemler kullanmaktadır:
+- **Canvas Fingerprinting**: Tarayıcıyı benzersiz bir parmak izi ile tanımlama
+- **Popup ve Modal Engelleri**: İçeriği gizleyen reklam ve cookie banner'ları
+- **User Agent Kontrolü**: Standart bot user agent'larını engelleme
+- **Rate Limiting**: Çok fazla istek gönderen IP'leri engelleme
+
+SB-Scraper, bu engelleri aşmak için gelişmiş teknikler kullanır:
+- **Canvas Noise Injection**: Canvas fingerprinting'i bozmak için tutarlı gürültü ekler
+- **JS Sentinel**: Popup, modal ve overlay'leri akıllıca temizler
+- **Rastgele User Agent**: Farklı tarayıcı ve işletim sistemlerini simüle eder
+- **Black-List Yönetimi**: Yasaklı domain'leri filtreler
+
+---
 
 ## ✨ Özellikler
 
-### 🔒 Anti-Detection Özellikleri
-- **WebDriver Gizleme:** `navigator.webdriver` özelliğini manipüle ederek bot tespitini önler
-- **Canvas Fingerprinting Koruması:** Dinamik ve tutarlı canvas gürültüsü ekler (piksel bazlı)
-- **WebGL Fingerprinting Koruması:** Vendor ve renderer bilgilerini standartlaştırır (Intel, NVIDIA, AMD)
-- **Audio Fingerprinting Koruması:** AudioContext ve analizör fonksiyonlarını manipüle eder
-- **Font Fingerprinting Koruması:** Font detection API'yi filtreler
-- **Screen/Display Manipülasyonu:** Ekran çözünürlük değerlerini hafifçe değiştirir
-- **Navigator API Manipülasyonu:** `plugins`, `languages`, `platform`, `hardwareConcurrency` vb. değerleri düzenler
-- **Chrome Object Emülasyonu:** Gerçek Chrome tarayıcı gibi görünür
-- **Headless Detection Bypass:** `navigator.headless` değerini gizler
-- **SeleniumBase Detection Bypass:** Selenium'in eklediği değişkenleri temizler
-- **Connection API:** Sahte bağlantı bilgileri sağlar
+### 🌐 Web Scraping
+- **HTML Kaynak Kodu**: Sayfanın tam HTML içeriğini alır
+- **Mobil Ekran Görüntüsü**: 375x812 piksel mobil görünümde screenshot alır
+- **Google Arama Sonuçları**: Siteyi Google'da aratır, sonuç ekran görüntüsü ve HTML alır
+- **DuckDuckGo Arama Sonuçları**: Siteyi DuckDuckGo'da aratır, sonuç ekran görüntüsü ve HTML alır
+- **Ana Domain Taraması**: Verilen URL'in ana domainini de tarar
+- **Ham URL Taraması**: Verilen URL'i doğrudan tarar
 
-### 🛡️ Captcha Çözme
-- **Google Consent:** Google çerez onay formlarını otomatik kabul eder
-- **Cloudflare:** Cloudflare captcha checkbox'larını tıklar
-- **ReCaptcha:** Google ReCaptcha checkbox'larını çözer
-- **Turnstile:** Cloudflare Turnstile captcha'larını çözer
-- **HCaptcha:** HCaptcha checkbox'larını çözer
+### 🛡️ Anti-Bot Detection
+- **Canvas Noise**: Canvas 2D ve WebGL fingerprinting'i bozar
+- **Audio Noise**: Audio fingerprinting'i bozar
+- **WebGL Vendor/Renderer Spoofing**: GPU bilgilerini değiştirir
+- **JS Sentinel**: Popup, modal, cookie banner'larını temizler
+- **Rastgele User Agent**: Windows, macOS, Linux platformları için UA seçenekleri
 
-### 🎯 Scraping Özellikleri
-- **Ham URL Taraması:** Verilen URL'i doğrudan tarar
-- **Ana Domain Taraması:** URL'in ana domainini (homepage) de tarar
-- **Mobil Görünüm:** Mobil cihaz ekran görüntüleri (375x812)
-- **HTML Kaynak Kodu:** Sayfa kaynak kodlarını Base64 formatında alır
-- **Google Arama:** Siteyi Google'da aratıp sonuç ekran görüntüsünü alır
-- **DuckDuckGo Arama:** Siteyi DuckDuckGo'da aratıp sonuç ekran görüntüsünü alır
-- **Network Trafik Logları (Opsiyonel):** XHR, Fetch ve Media (video/audio) ağ trafiğini yakalar
+### 📊 Loglama ve İzleme
+- **PostgreSQL Loglama**: Tüm loglar veritabanında saklanır
+- **Request Tracking**: Her isteğin detayları (IP, headers, query params, response time) loglanır
+- **Domain Stats**: Scraping istatistikleri (success/error count, success rate) takip edilir
+- **Error Logging**: Hatalar ayrı bir tabloda saklanır, hızlı sorgulama için optimize edilir
+- **Structured Logging**: JSON formatında loglama (opsiyonel)
 
-### 📡 Network Trafik Analizi
-- **API Trafiği:** JSON/XML/API çağrılarını tespit eder
-- **Tracker Trafiği:** Analytics ve tracker çağrılarını tespit eder
-- **Script Trafiği:** Harici JavaScript yüklemelerini tespit eder
-- **Gürültü Filtreleme:** CSS, font, görsel ve medya dosyalarını filtreler
-- **Çift Yöntem:** Driver logları ve JS Performance API ile geri dönüşlü yakalama
+### 🎛️ Yönetim ve İzleme
+- **Log Viewer Web UI**: PostgreSQL loglarını görselleştiren Flask uygulaması
+- **System Monitor**: RAM/CPU kullanımını izler, otomatik temizlik yapar
+- **Health Check**: `/health` endpoint ile servis durumu kontrolü
+- **Swagger UI**: Otomatik API dokümantasyonu
 
-### 🚫 Black-List Koruması
-- 500+ önceden tanımlanmış domain filtresi
-- URL ve domain bazlı kontrol
-- Subdomain kontrolü (parent domain'leri de kontrol eder)
-- Otomatik filtreleme ve loglama
+### 🔒 Güvenlik
+- **API Key Authentication**: X-API-Key header ile doğrulama (opsiyonel)
+- **Rate Limiting**: İstek sınırlama (opsiyonel)
+- **CORS Support**: Cross-Origin Resource Sharing (opsiyonel)
+- **Sensitive Header Filtering**: Hassas header'lar loglanmaz
+- **Request Body Truncation**: Büyük request body'ler truncate edilir
 
-### 🧹 Popup Temizleme (Sentinel JS)
-- Akıllı popup tespiti ve temizleme
-- Z-index bazlı overlay kontrolü
-- Yasaklı kelime filtrelemesi
-- Geometrik av (yan bantlar, tam ekran overlay'ler)
-- MutationObserver ile sürekli DOM izleme
-- Performans optimizasyonu (debounce ve requestAnimationFrame)
+---
 
-### 🌐 User Agent Rotasyonu
-- **Windows:** Chrome 119-120, Firefox 120-121, Edge 120
-- **macOS:** Chrome 119-120, Firefox 121, Safari 17.2
-- **Linux:** Chrome 120, Firefox 121
-- Platform seçimi `.env` dosyasından yapılandırılabilir
-
-### 📊 Loglama
-- Renkli konsol logları (Loguru)
-- Dosya tabanlı loglama (info.log, error.log)
-- Otomatik log rotasyonu (10 MB)
-- Log saklama süresi (7-30 gün)
-- Zaman damgalı ve formatlı loglar
-
-## 🏗️ Teknik Mimari
+## 🏗️ Mimari
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                     FastAPI Application                      │
-│                    (app/main.py)                            │
-└────────────────────────┬────────────────────────────────────┘
-                          │
-                          ▼
-┌─────────────────────────────────────────────────────────────┐
-│                   BrowserManager                            │
-│                  (app/core/browser.py)                       │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │  SeleniumBase Driver (Chrome)                        │  │
-│  │  - Anti-Detection Scripts                            │  │
-│  │  - Canvas Noise (Dinamik Piksel)                     │  │
-│  │  - WebGL/Audio/Font Protection                       │  │
-│  │  - User Agent Rotation                               │  │
-│  │  - Captcha Solver (5 Tür)                            │  │
-│  │  - Popup Cleaner (Sentinel)                         │  │
-│  │  - Network Traffic Capture                          │  │
-│  └──────────────────────────────────────────────────────┘  │
-└────────────────────────┬────────────────────────────────────┘
-                          │
-          ┌───────────────┼───────────────┐
-          ▼               ▼               ▼
-┌────────────────┐ ┌──────────────┐ ┌─────────────┐
-│ BlacklistMgr   │ │ Logger       │ │ Config      │
-│ (black-list)   │ │ (Loguru)     │ │ (Pydantic)  │
-└────────────────┘ └──────────────┘ └─────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                         Client / User                             │
+└──────────────────────────────┬──────────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                        FastAPI Application                        │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │  Middleware Layer                                          │  │
+│  │  - Request Tracker (IP, Headers, Query, Body)            │  │
+│  │  - Rate Limiting (Opsiyonel)                               │  │
+│  │  - CORS (Opsiyonel)                                        │  │
+│  │  - API Key Authentication (Opsiyonel)                     │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │  API Endpoints                                            │  │
+│  │  - POST /scrape (Ana scraping endpoint)                   │  │
+│  │  - GET /health (Health check)                             │  │
+│  │  - GET /tasks (Task queue status)                         │  │
+│  │  - GET /monitor (System monitor)                          │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │  Core Components                                          │  │
+│  │  - BrowserManager (SeleniumBase Singleton)                │  │
+│  │  - BlacklistManager (Domain filtering)                    │  │
+│  │  - TaskQueue (Async task management)                      │  │
+│  │  - SystemMonitor (Resource monitoring)                    │  │
+│  └───────────────────────────────────────────────────────────┘  │
+└──────────────────────────────┬──────────────────────────────────┘
+                               │
+        ┌──────────────────────┼──────────────────────┐
+        │                      │                      │
+        ▼                      ▼                      ▼
+┌──────────────┐    ┌──────────────────┐    ┌──────────────────┐
+│  PostgreSQL  │    │  Chrome Browser  │    │  Log Viewer UI   │
+│              │    │  (SeleniumBase)  │    │  (Flask App)     │
+│ - app_logs   │    │ - Canvas Noise   │    │ - Dashboard      │
+│ - req_logs   │    │ - JS Sentinel    │    │ - Statistics     │
+│ - error_logs │    │ - Random UA      │    │ - Export         │
+│ - domain_    │    │ - Screenshot     │    │ - Live Metrics   │
+│   stats      │    │                  │    │                  │
+└──────────────┘    └──────────────────┘    └──────────────────┘
 ```
 
-### Teknoloji Stack
+### Tasarım Desenleri
 
-| Bileşen | Teknoloji |
-|---------|-----------|
-| Web Framework | FastAPI |
-| Web Scraping | SeleniumBase |
-| Validation | Pydantic |
-| Logging | Loguru |
-| ASGI Server | Uvicorn / Gunicorn |
-| Database | PostgreSQL (Opsiyonel) |
-| Containerization | Docker / Docker Compose |
+| Desen | Kullanım Alanı | Açıklama |
+|-------|---------------|----------|
+| **Singleton** | `BrowserManager`, `TaskQueue`, `PostgresHandler` | Tek bir instance kullanılır, thread-safe |
+| **Factory** | `ConnectionPool` | Bağlantı havuzu oluşturma |
+| **Middleware** | `request_tracker_middleware` | Request/response logging |
+| **Observer** | `SystemMonitor` | Callback fonksiyonları ile event handling |
+| **Repository** | `postgres_logger` | Veritabanı işlemleri soyutlanır |
+
+---
+
+## 🛠️ Teknoloji Yığını
+
+### Backend Framework
+- **FastAPI 0.109.0**: Modern, hızlı, async Python web framework
+  - Otomatik API dokümantasyonu (Swagger UI)
+  - Pydantic ile data validation
+  - Async/await desteği
+  - Type hints ile IDE desteği
+
+### Web Scraping
+- **SeleniumBase 4.46.0**: Selenium üzerine kurulu gelişmiş scraping kütüphanesi
+  - Otomatik driver yönetimi
+  - Visual regression testing
+  - CSS/XPath selector desteği
+  - Screenshot alma özelliği
+
+### Veritabanı
+- **PostgreSQL 15**: Güçlü, açık kaynaklı ilişkisel veritabanı
+  - JSONB desteği (structured data için)
+  - Full-text search
+  - Advanced indexing
+  - Timezone-aware timestamp
+- **asyncpg 0.29.0**: PostgreSQL için async driver
+  - High performance
+  - Connection pooling
+  - Prepared statements
+- **psycopg2-binary 2.9.9**: Log Viewer için sync driver
+
+### Loglama
+- **Loguru 0.7.2**: Python logging kütüphanesi
+  - Structured logging (JSON format)
+  - Rotation ve retention
+  - Custom handler desteği
+  - Thread-safe
+
+### Validation
+- **Pydantic 2.5.0**: Data validation kütüphanesi
+  - Type hints ile validation
+  - Custom validators
+  - Serialization/Deserialization
+- **pydantic-settings 2.1.0**: Settings management
+
+### Web Server
+- **Uvicorn 0.27.0**: ASGI server
+  - Async/await desteği
+  - HTTP/1.1 ve WebSocket
+  - Process/Thread management
+- **Gunicorn 21.2.0**: WSGI HTTP server (production için)
+
+### Diğer Kütüphaneler
+- **requests 2.32.5**: HTTP requests
+- **python-dotenv 1.0.0**: .env dosyası desteği
+- **pandas 2.1.4**: Data manipulation
+- **psutil 6.0.0**: System monitoring
+- **memory_profiler 0.61.0**: Memory profiling
+
+### Frontend (Log Viewer)
+- **Flask**: Web framework
+- **Bootstrap 5**: UI framework
+- **Chart.js**: Grafik kütüphanesi
+- **jQuery**: JavaScript kütüphanesi
+
+---
 
 ## 📦 Kurulum
 
 ### Gereksinimler
-- Python 3.9+
-- Docker (Docker ile çalıştırmak için)
-- Google Chrome
+
+- **Python 3.11+**
+- **PostgreSQL 15+**
+- **Docker & Docker Compose** (opsiyonel ama önerilir)
+
+### Docker ile Kurulum (Önerilen)
+
+1. **Projeyi klonlayın:**
+```bash
+git clone https://github.com/your-username/sb-scrapper.git
+cd sb-scrapper
+```
+
+2. **`.env` dosyasını oluşturun:**
+```bash
+cp .env.example .env
+```
+
+3. **`.env` dosyasını düzenleyin:**
+```bash
+# PostgreSQL şifresini değiştirin
+POSTGRES_PASSWORD=your_strong_password_here
+
+# Diğer ayarları ihtiyacınıza göre düzenleyin
+```
+
+4. **Docker Compose ile başlatın:**
+```bash
+docker-compose up -d
+```
+
+5. **Servislerin durumunu kontrol edin:**
+```bash
+docker-compose ps
+```
 
 ### Manuel Kurulum
 
+1. **Python sanal ortamı oluşturun:**
 ```bash
-# Depoyu klonlayın
-git clone https://github.com/example/sb-scrapper.git
-cd sb-scrapper
+python3.11 -m venv venv
+source venv/bin/activate  # Linux/macOS
+# veya
+venv\Scripts\activate  # Windows
+```
 
-# Sanal ortam oluşturun
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-
-# Bağımlılıkları yükleyin
+2. **Bağımlılıkları yükleyin:**
+```bash
 pip install -r requirements.txt
-
-# .env dosyasını oluşturun
-cp .env.example .env
-
-# .env dosyasını düzenleyin
-nano .env
 ```
 
-## 🐳 Docker ile Çalıştırma
-
-### Hızlı Başlatma
-
+3. **Chromedriver indirin:**
 ```bash
-# Konteyneri başlat
-docker-compose up -d
-
-# Logları izle
-docker-compose logs -f
-
-# Konteyneri durdur
-docker-compose down
+seleniumbase get chromedriver --path
 ```
 
-### Multi-Stage Build
-
-Dockerfile, optimize edilmiş multi-stage build kullanır:
-
-1. **Base Stage:** Ubuntu 22.04, Chrome, sistem bağımlılıkları
-2. **Python-Dep Stage:** SeleniumBase ve chromedriver kurulumu
-3. **Final Stage:** Uygulama ve bağımlılıklar
-
-### Ortam Değişkenleri
-
-```yaml
-# docker-compose.yml veya .env dosyasında
-HEADLESS=true          # Headless mod (true/false)
-WAIT_TIME=8            # Sayfa yükleme bekleme süresi (saniye)
-LOG_LEVEL=INFO         # Log seviyesi (DEBUG, INFO, WARNING, ERROR)
-BLACKLIST_FILE=black-list.lst  # Black-list dosya yolu
-PORT=8000              # API portu
-USER_AGENT_PLATFORM=windows  # User Agent platform (windows/macos/linux)
+4. **PostgreSQL veritabanını oluşturun:**
+```sql
+CREATE DATABASE sb_scrapper;
+CREATE USER sb_user WITH PASSWORD 'your_password';
+GRANT ALL PRIVILEGES ON DATABASE sb_scrapper TO sb_user;
 ```
+
+5. **Migration'ları çalıştırın:**
+```bash
+psql -U sb_user -d sb_scrapper -f migrations/001_initial_schema.sql
+psql -U sb_user -d sb_scrapper -f migrations/002_add_indexes.sql
+psql -U sb_user -d sb_scrapper -f migrations/003_cleanup_function.sql
+```
+
+6. **Uygulamayı başlatın:**
+```bash
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+---
 
 ## 🚀 Kullanım
+
+### API Endpoint'leri
+
+#### 1. Web Scraping
+
+```bash
+curl -X POST "http://localhost:8000/scrape" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://example.com",
+    "wait_time": 8,
+    "get_html": true,
+    "get_mobile_ss": true,
+    "get_google_search": true,
+    "get_google_html": true,
+    "get_ddg_search": true,
+    "get_ddg_html": true,
+    "process_raw_url": true,
+    "process_main_domain": true
+  }'
+```
+
+#### 2. Health Check
+
+```bash
+curl http://localhost:8000/health
+```
+
+#### 3. Task Queue Status
+
+```bash
+curl http://localhost:8000/tasks
+```
+
+#### 4. System Monitor
+
+```bash
+curl http://localhost:8000/monitor
+```
 
 ### Python ile Kullanım
 
 ```python
 import requests
-import base64
 
-API_URL = "http://localhost:8000/analyze"
+# API endpoint
+url = "http://localhost:8000/scrape"
 
+# Request payload
 payload = {
     "url": "https://example.com",
-    "wait_time": 10,
-    "process_raw_url": True,
-    "process_main_domain": True,
+    "wait_time": 8,
     "get_html": True,
     "get_mobile_ss": True,
     "get_google_search": True,
     "get_google_html": True,
     "get_ddg_search": True,
     "get_ddg_html": True,
-    "capture_network_logs": False,  # Ağ trafiğini yakalamak için True yapın
-    "force_refresh": False
+    "process_raw_url": True,
+    "process_main_domain": True
 }
 
-response = requests.post(API_URL, json=payload, timeout=180)
-result = response.json()
+# İsteği gönder
+response = requests.post(url, json=payload)
 
-# Ekran görüntüsünü kaydet
-if result.get('raw_desktop_ss'):
-    img_data = base64.b64decode(result['raw_desktop_ss'].split(',')[1])
-    with open("screenshot.png", "wb") as f:
-        f.write(img_data)
-
-print(f"Durum: {result['status']}")
-print(f"Süre: {result['duration']:.2f} saniye")
-print(f"Loglar: {result['logs']}")
-
-# Network trafiği (capture_network_logs=True ise)
-if result.get('network_logs'):
-    print(f"Yakalanan ağ istekleri: {len(result['network_logs'])}")
-    for log in result['network_logs']:
-        print(f"  - {log['type']}: {log['domain']}")
+# Sonucu yazdır
+print(response.json())
 ```
 
-### cURL ile Kullanım
+### JavaScript ile Kullanım
 
-```bash
-curl -X POST "http://localhost:8000/analyze" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "url": "https://example.com",
-    "wait_time": 10,
-    "process_raw_url": true,
-    "process_main_domain": true,
-    "get_html": true,
-    "get_mobile_ss": true,
-    "get_google_search": true,
-    "get_ddg_search": true,
-    "capture_network_logs": false
-  }'
+```javascript
+const response = await fetch('http://localhost:8000/scrape', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    url: 'https://example.com',
+    wait_time: 8,
+    get_html: true,
+    get_mobile_ss: true,
+    get_google_search: true,
+    get_google_html: true,
+    get_ddg_search: true,
+    get_ddg_html: true,
+    process_raw_url: true,
+    process_main_domain: true
+  })
+});
+
+const data = await response.json();
+console.log(data);
 ```
 
-## 📖 API Dokümantasyonu
+---
 
-### Endpoint'ler
-
-#### 1. GET `/` - API Durum Kontrolü
-
-API'nin çalışıp çalışmadığını kontrol eder.
-
-**Response:**
-```json
-{
-  "status": "ok",
-  "message": "SB-Scraper API is running"
-}
-```
-
-#### 2. GET `/health` - Sağlık Kontrolü
-
-API'nin ve tarayıcının sağlık durumunu kontrol eder.
-
-**Response:**
-```json
-{
-  "status": "healthy"
-}
-```
-
-#### 3. POST `/analyze` - URL Analizi Yap
-
-Belirtilen URL'i tarar ve çeşitli çıktılar üretir.
-
-**Request Body:**
-```json
-{
-  "url": "https://example.com",
-  "wait_time": 8,
-  "process_raw_url": true,
-  "process_main_domain": true,
-  "get_html": true,
-  "get_mobile_ss": true,
-  "get_google_search": true,
-  "get_google_html": true,
-  "get_ddg_search": true,
-  "get_ddg_html": true,
-  "capture_network_logs": false,
-  "force_refresh": false
-}
-```
-
-**Parametreler:**
-
-| Parametre | Tip | Zorunlu | Varsayılan | Açıklama |
-|-----------|-----|---------|------------|----------|
-| `url` | string | Evet | - | Taranacak web sitesi adresi |
-| `wait_time` | integer | Hayır | 8 | Sayfa yüklendikten sonra beklenecek saniye (1-60) |
-| `process_raw_url` | boolean | Hayır | true | Verilen URL'i doğrudan tarar |
-| `process_main_domain` | boolean | Hayır | true | URL'in ana domainini (homepage) de tarar |
-| `get_html` | boolean | Hayır | true | HTML kaynak kodunu alır |
-| `get_mobile_ss` | boolean | Hayır | true | Mobil ekran görüntüsü alır |
-| `get_google_search` | boolean | Hayır | true | Google arama sonucu alır |
-| `get_google_html` | boolean | Hayır | true | Google arama sonucu HTML'ini alır |
-| `get_ddg_search` | boolean | Hayır | true | DuckDuckGo arama sonucu alır |
-| `get_ddg_html` | boolean | Hayır | true | DuckDuckGo arama sonucu HTML'ini alır |
-| `capture_network_logs` | boolean | Hayır | false | XHR, Fetch ve Media (video/audio) ağ trafiğini yakalar |
-| `force_refresh` | boolean | Hayır | false | Tarayıcıyı zorla yeniden başlatır |
-
-**Response:**
-```json
-{
-  "status": "success",
-  "raw_desktop_ss": "data:image/png;base64,iVBORw0KGgo...",
-  "raw_mobile_ss": "data:image/png;base64,iVBORw0KGgo...",
-  "raw_html": "PGh0bWw+PGhlYWQ+Li4uPC9oZWFkPjwvaHRtbD4=",
-  "main_desktop_ss": "data:image/png;base64,iVBORw0KGgo...",
-  "google_ss": "data:image/png;base64,iVBORw0KGgo...",
-  "google_html": "PGh0bWw+PGhlYWQ+Li4uPC9oZWFkPjwvaHRtbD4=",
-  "ddg_ss": "data:image/png;base64,iVBORw0KGgo...",
-  "ddg_html": "PGh0bWw+PGhlYWQ+Li4uPC9oZWFkPjwvaHRtbD4=",
-  "logs": [
-    "Adım 1: Ham URL -> https://example.com",
-    "✅ Google Çerezi Tıklandı",
-    "✅ Bitti"
-  ],
-  "duration": 12.45,
-  "blacklisted_domain": null,
-  "network_logs": [
-    {
-      "source": "driver",
-      "type": "api",
-      "domain": "api.example.com",
-      "url": "https://api.example.com/data",
-      "status": 200,
-      "size": 12345
-    }
-  ]
-}
-```
-
-**Not:** `network_logs` alanı sadece `capture_network_logs: true` olarak ayarlandığında dolu gelir. Varsayılan olarak boş liste döner.
-
-**Durum Kodları:**
-- `200` - Başarılı
-- `429` - Tarayıcı meşgul (BUSY)
-- `500` - İç sunucu hatası
-
-**Durum Değerleri:**
-- `success` - İşlem başarıyla tamamlandı
-- `error` - İşlem sırasında hata oluştu
-- `blacklisted` - Domain black-list'te bulundu
-- `processing` - İşlem devam ediyor (geçici durum)
+## 📊 API Dokümantasyonu
 
 ### Swagger UI
 
-API dokümantasyonu için Swagger UI kullanılabilir:
+API dokümantasyonu otomatik olarak oluşturulur:
 
 ```
 http://localhost:8000/docs
 ```
 
-Alternatif olarak ReDoc:
+### ReDoc
+
+Alternatif dokümantasyon:
 
 ```
 http://localhost:8000/redoc
 ```
 
-## ⚙️ Konfigürasyon
+### Request Schema
 
-### .env Dosyası
+```python
+class ScrapeRequest(BaseModel):
+    # Zorunlu alanlar
+    url: str  # Taranacak URL
+    
+    # Zaman ayarları
+    wait_time: int = 8  # Bekleme süresi (saniye)
+    
+    # İşlem ayarları
+    process_raw_url: bool = True  # Ham URL tara
+    process_main_domain: bool = True  # Ana domain tara
+    
+    # Çıktı ayarları
+    get_html: bool = True  # HTML al
+    get_mobile_ss: bool = True  # Mobil screenshot al
+    
+    # Arama motorları
+    get_google_search: bool = True  # Google arama SS al
+    get_google_html: bool = True  # Google HTML al
+    get_ddg_search: bool = True  # DuckDuckGo arama SS al
+    get_ddg_html: bool = True  # DuckDuckGo HTML al
+```
+
+### Response Schema
+
+```python
+class ScrapeResponse(BaseModel):
+    success: bool
+    url: str
+    domain: str
+    timestamp: str
+    
+    # Scraping sonuçları
+    html: Optional[str]  # Base64 encoded HTML
+    mobile_screenshot: Optional[str]  # Base64 encoded screenshot
+    
+    # Arama motoru sonuçları
+    google_search_screenshot: Optional[str]
+    google_html: Optional[str]
+    ddg_search_screenshot: Optional[str]
+    ddg_html: Optional[str]
+    
+    # Meta bilgiler
+    processing_time_ms: int
+    error: Optional[str]
+```
+
+---
+
+## 🔧 Konfigürasyon
+
+### Environment Variables
+
+#### Tarayıcı Ayarları
+
+| Variable | Default | Açıklama |
+|----------|---------|----------|
+| `HEADLESS` | `true` | Tarayıcı headless modda çalışır |
+| `WAIT_TIME` | `8` | Sayfa yüklendikten sonra bekleme süresi (saniye) |
+| `USER_AGENT_PLATFORM` | `windows` | User Agent platformu (windows/macos/linux) |
+| `PAGE_LOAD_TIMEOUT` | `60` | Sayfa yükleme zaman aşımı (saniye) |
+| `BODY_CHECK_WAIT_TIME` | `2` | JavaScript yüklenmesi için bekleme (saniye) |
+| `PAGE_RELOAD_WAIT_TIME` | `5` | Sayfa yeniden yükleme bekleme (saniye) |
+
+#### API Ayarları
+
+| Variable | Default | Açıklama |
+|----------|---------|----------|
+| `HOST` | `0.0.0.0` | API sunucusu adresi |
+| `PORT` | `8000` | API sunucusu portu |
+
+#### Loglama Ayarları
+
+| Variable | Default | Açıklama |
+|----------|---------|----------|
+| `LOG_LEVEL` | `INFO` | Log seviyesi (DEBUG/INFO/WARNING/ERROR) |
+| `CONSOLE_LOGGING_ENABLED` | `true` | Konsola log yazma |
+| `POSTGRES_LOGGING_ENABLED` | `true` | PostgreSQL'e log yazma |
+| `STRUCTURED_LOGGING_ENABLED` | `false` | JSON formatında loglama |
+
+#### PostgreSQL Ayarları
+
+| Variable | Default | Açıklama |
+|----------|---------|----------|
+| `POSTGRES_HOST` | `postgres` | PostgreSQL sunucusu adresi |
+| `POSTGRES_PORT` | `5432` | PostgreSQL portu |
+| `POSTGRES_DB` | `sb_scrapper` | Veritabanı adı |
+| `POSTGRES_USER` | `sb_user` | Kullanıcı adı |
+| `POSTGRES_PASSWORD` | - | Şifre (zorunlu) |
+| `POSTGRES_POOL_SIZE` | `10` | Connection pool boyutu |
+| `POSTGRES_MAX_OVERFLOW` | `20` | Maksimum overflow |
+| `POSTGRES_MAX_RETRIES` | `5` | Maksimum retry sayısı |
+
+#### Retention Policy
+
+| Variable | Default | Açıklama |
+|----------|---------|----------|
+| `LOG_RETENTION_DAYS` | `30` | Log saklama süresi (gün) |
+| `ERROR_RETENTION_DAYS` | `30` | Hata log saklama süresi (gün) |
+| `REQUEST_RETENTION_DAYS` | `30` | Request log saklama süresi (gün) |
+| `DOMAIN_STATS_RETENTION_DAYS` | `30` | Domain stats saklama süresi (gün) |
+
+#### Canvas Noise Ayarları
+
+| Variable | Default | Açıklama |
+|----------|---------|----------|
+| `NOISE_MIN_VALUE` | `-20` | Minimum gürültü değeri |
+| `NOISE_MAX_VALUE` | `20` | Maksimum gürültü değeri |
+
+#### Rate Limiting (Opsiyonel)
+
+| Variable | Default | Açıklama |
+|----------|---------|----------|
+| `RATE_LIMITING_ENABLED` | `false` | Rate limiting aktif mi |
+| `RATE_LIMIT_REQUESTS` | `100` | Maksimum istek sayısı |
+| `RATE_LIMIT_PERIOD` | `60` | Periyot (saniye) |
+
+#### Authentication (Opsiyonel)
+
+| Variable | Default | Açıklama |
+|----------|---------|----------|
+| `AUTH_ENABLED` | `false` | API key doğrulama aktif mi |
+| `AUTH_API_KEY` | - | API key (zorunlu) |
+
+---
+
+## 📈 Log Viewer
+
+Log Viewer, PostgreSQL'teki log verilerini görselleştiren bir Flask uygulamasıdır.
+
+### Özellikler
+
+- **Dashboard**: Genel istatistikler ve metrikler
+- **Application Logs**: Uygulama loglarını filtrele ve görüntüle
+- **Request Logs**: Request/response loglarını görüntüle
+- **Error Logs**: Hata loglarını görüntüle
+- **Domain Stats**: Scraping istatistiklerini görüntüle
+- **Export**: Logları CSV olarak dışa aktar
+- **Live Metrics**: Canlı metrikler
+
+### Erişim
+
+```
+http://localhost:5000
+```
+
+### API Endpoints
+
+| Endpoint | Açıklama |
+|----------|----------|
+| `/api/health` | Health check |
+| `/api/stats` | Genel istatistikler |
+| `/api/logs` | Application logs |
+| `/api/requests` | Request logs |
+| `/api/errors` | Error logs |
+| `/api/domain-stats` | Domain stats |
+| `/api/export` | CSV export |
+
+---
+
+## 🐳 Docker
+
+### Docker Compose Servisleri
+
+#### 1. PostgreSQL
+- PostgreSQL 15 Alpine
+- Otomatik migration çalıştırma
+- Health check
+- Volume persistence
+
+#### 2. SB-Scraper
+- FastAPI uygulaması
+- SeleniumBase ile Chrome
+- Health check
+- PostgreSQL'e bağımlı
+
+#### 3. Log Viewer
+- Flask uygulaması
+- PostgreSQL'e bağımlı
+- Health check
+
+### Docker Komutları
 
 ```bash
-# Tarayıcı Ayarları
-HEADLESS=true          # Headless mod (true/false)
-WAIT_TIME=8            # Sayfa yükleme bekleme süresi (saniye)
-USER_AGENT_PLATFORM=windows  # User Agent platform (windows/macos/linux)
+# Servisleri başlat
+docker-compose up -d
 
-# API Ayarları
-HOST=0.0.0.0           # API host adresi
-PORT=8000              # API portu
+# Servisleri durdur
+docker-compose down
 
-# Loglama Ayarları
-LOG_LEVEL=INFO         # Log seviyesi (DEBUG, INFO, WARNING, ERROR)
-LOG_DIR=logs           # Log dizini
-LOG_INFO_FILE=info.log # Info log dosyası
-LOG_ERROR_FILE=error.log # Error log dosyası
+# Servisleri durdur ve volume'ları sil
+docker-compose down -v
 
-# Black-List Ayarları
-BLACKLIST_FILE=black-list.lst  # Black-list dosya yolu
+# Logları görüntüle
+docker-compose logs -f
+
+# Belirli bir servisin loglarını görüntüle
+docker-compose logs -f sb-scraper
+
+# Servisi yeniden başlat
+docker-compose restart sb-scraper
+
+# Yeni build ile başlat
+docker-compose up -d --build
+
+# Servis durumunu kontrol et
+docker-compose ps
 ```
 
-### Veritabanı Desteği (Opsiyonel)
+### Dockerfile Yapısı
 
-Proje PostgreSQL veritabanı desteği ile birlikte gelir. Veritabanı bağlantısı için gerekli ayarlar:
+Dockerfile multi-stage build kullanır:
 
-```bash
-# Veritabanı Ayarları (.env dosyasına eklenebilir)
-DB_HOST=localhost      # Veritabanı host adresi
-DB_PORT=5432           # Veritabanı portu
-DB_NAME=sb_scraper     # Veritabanı adı
-DB_USER=postgres       # Veritabanı kullanıcı adı
-DB_PASSWORD=secret     # Veritabanı şifresi
-```
+1. **Base Stage**: Temel kurulumlar (Chrome, fonts, dependencies)
+2. **Python-Deps Stage**: Python bağımlılıkları
+3. **Final Stage**: Uygulama kodu ve çalışma ortamı
 
-**Not:** Veritabanı bağlantısı şu an opsiyonel olarak eklenmiştir ve gelecekteki sürümlerde kullanılacaktır.
+Bu yapı, image boyutunu küçültür ve build sürelerini optimize eder.
 
-### Black-List Yönetimi
+---
 
-Black-list dosyası [`black-list.lst`](black-list.lst:1) her satıra bir domain olacak şekilde düzenlenir:
-
-```
-youtube.com
-www.google.com
-facebook.com
-...
-```
-
-Yorum satırları `#` ile başlar:
-
-```
-# Sosyal medya siteleri
-youtube.com
-facebook.com
-twitter.com
-```
-
-## 📁 Proje Yapısı
+## 📂 Proje Yapısı
 
 ```
 sb-scrapper/
 ├── app/
 │   ├── __init__.py
-│   ├── main.py                 # FastAPI ana uygulaması
-│   ├── config.py              # Konfigürasyon yönetimi (Pydantic Settings)
-│   ├── schemas.py              # Pydantic modelleri (Request/Response)
-│   ├── swagger_config.py       # Swagger UI özelleştirme
+│   ├── main.py                 # FastAPI ana uygulama
+│   ├── config.py               # Konfigürasyon yönetimi
+│   ├── schemas.py              # Pydantic modelleri
+│   ├── swagger_config.py       # Swagger konfigürasyonu
 │   │
 │   ├── core/
 │   │   ├── __init__.py
-│   │   ├── browser.py          # Tarayıcı yöneticisi (Singleton)
-│   │   ├── blacklist.py        # Black-list yönetimi
-│   │   └── logger.py           # Loguru loglama
+│   │   ├── browser.py          # SeleniumBase browser manager
+│   │   ├── logger.py           # Loguru logger
+│   │   ├── postgres_logger.py  # PostgreSQL log handler
+│   │   └── blacklist.py        # Black-list yönetimi
+│   │
+│   ├── db/
+│   │   ├── __init__.py
+│   │   ├── connection.py       # PostgreSQL connection pool
+│   │   └── models.py           # SQLAlchemy modelleri
+│   │
+│   ├── middleware/
+│   │   ├── __init__.py
+│   │   └── request_tracker.py  # Request tracking middleware
 │   │
 │   ├── payloads/
 │   │   ├── __init__.py
-│   │   ├── noise_js.py         # Canvas noise JavaScript (Anti-Fingerprint)
-│   │   └── sentinel_js.py      # Popup temizleme JavaScript
+│   │   ├── noise_js.py         # Canvas noise JavaScript
+│   │   └── sentinel_js.py      # JS sentinel (popup remover)
+│   │
+│   ├── tasks/
+│   │   ├── __init__.py
+│   │   └── queue.py            # Async task queue
 │   │
 │   └── utils/
 │       ├── __init__.py
-│       └── user_agents.py      # User Agent listesi (Windows/macOS/Linux)
+│       ├── monitor.py          # System monitor
+│       ├── memory_monitor.py   # Memory monitor
+│       └── user_agents.py      # User agent listesi
+│
+├── log-viewer/
+│   ├── app.py                  # Flask uygulaması
+│   ├── Dockerfile              # Log viewer Dockerfile
+│   ├── requirements.txt        # Python bağımlılıkları
+│   ├── static/                 # Static dosyalar
+│   │   ├── css/
+│   │   ├── js/
+│   │   └── favicon.ico
+│   └── templates/
+│       ├── index.html          # Ana dashboard
+│       └── favicon.ico
+│
+├── migrations/
+│   ├── 001_initial_schema.sql  # Tablolar
+│   ├── 002_add_indexes.sql     # İndeksler
+│   └── 003_cleanup_function.sql # Cleanup fonksiyonu
 │
 ├── static/
-│   └── swagger-ui.css          # Swagger UI özel stilleri
+│   └── swagger-ui.css          # Custom Swagger CSS
 │
-├── logs/                       # Log dosyaları (runtime'da oluşturulur)
-│
-├── black-list.lst              # Black-list domain listesi
-├── requirements.txt            # Python bağımlılıkları
-├── Dockerfile                  # Docker imajı (Multi-stage build)
-├── docker-compose.yml          # Docker Compose konfigürasyonu
-├── .env.example                # Örnek ortam değişkenleri
-├── .gitignore                  # Git ignore dosyası
+├── black-list.lst              # Yasaklı domain listesi
+├── .env.example                # Örnek environment dosyası
 ├── .dockerignore               # Docker ignore dosyası
-├── LICENSE                     # MIT Lisans dosyası
-└── README.md                   # Bu dosya
+├── .gitignore                  # Git ignore dosyası
+├── docker-compose.yml          # Docker Compose konfigürasyonu
+├── Dockerfile                  # Ana Dockerfile
+├── requirements.txt            # Python bağımlılıkları
+└── LICENSE                     # MIT lisansı
 ```
-## ❓ Sık Karşılaşılan Sorular
-
-### Q: Tarayıcı neden headless modda çalışıyor?
-
-A: Headless mod, sunucu ortamlarında grafik arayüz olmadan çalışmak için kullanılır. Headless modu kapatmak için `.env` dosyasında `HEADLESS=false` yapın.
-
-### Q: BUSY hatası alıyorum, ne yapmalıyım?
-
-A: Tarayıcı şu anda başka bir işlemde. Birkaç saniye bekleyip tekrar deneyin veya `force_refresh: true` parametresini kullanarak tarayıcıyı yeniden başlatın.
-
-### Q: Captcha çözülmüyor, ne yapmalıyım?
-
-A: Bazı captcha türleri otomatik çözülemeyebilir. Bu durumda:
-1. `wait_time` değerini artırın
-2. `force_refresh: true` ile tarayıcıyı yeniden başlatın
-3. Manuel müdahale için headless modu kapatın
-
-### Q: Black-list'e yeni domain nasıl eklenir?
-
-A: [`black-list.lst`](black-list.lst:1) dosyasına her satıra bir domain ekleyin:
-
-```
-example.com
-www.example.com
-```
-
-### Q: Subdomain kontrolü nasıl çalışır?
-
-A: Black-list sistemi subdomain'leri de kontrol eder. Örneğin, `example.com` black-list'teyse, `sub.example.com` da otomatik olarak engellenir.
-
-### Q: Network trafiği nasıl yakalanır?
-
-A: `capture_network_logs: true` parametresini kullanarak XHR, Fetch ve Media trafiğini yakalayabilirsiniz. Sistem iki yöntem kullanır:
-1. Driver logları (Chrome DevTools Performance API)
-2. JS Performance API (Fallback)
-
-### Q: Log dosyaları nerede?
-
-A: Varsayılan olarak `logs/` klasöründe:
-- `info.log` - INFO seviyesindeki loglar
-- `error.log` - ERROR seviyesindeki loglar
-
-### Q: User Agent nasıl değiştirilir?
-
-A: `.env` dosyasında `USER_AGENT_PLATFORM` değerini değiştirerek platform seçebilirsiniz: `windows`, `macos`, veya `linux`.
-
-### Q: Docker konteyneri başlamıyor, ne yapmalıyım?
-
-A: Konteyner loglarını kontrol edin:
-
-```bash
-docker-compose logs sb-scraper
-```
-
-### Q: Memory leak görüyorum, ne yapmalıyım?
-
-A: `force_refresh: true` parametresini kullanarak tarayıcıyı düzenli olarak yeniden başlatın.
-
-### Q: Popup temizleme nasıl çalışır?
-
-A: Sentinel JS scripti şu teknikleri kullanır:
-- CSS selector ile popup'ları gizler
-- Z-index bazlı overlay kontrolü
-- Yasaklı kelime filtrelemesi
-- Geometrik av (yan bantlar, tam ekran overlay'ler)
-- MutationObserver ile sürekli DOM izleme
-
-## 📄 Lisans
-
-Bu proje MIT Lisansı altında lisanslanmıştır. Detaylar için [LICENSE](LICENSE) dosyasına bakın.
-
-## 🙏 Teşekkürler
-
-- [SeleniumBase](https://github.com/seleniumbase/SeleniumBase) - Güçlü web scraping kütüphanesi
-- [FastAPI](https://fastapi.tiangolo.com/) - Modern web framework
-- [Loguru](https://github.com/Delgan/loguru) - Güzel loglama kütüphanesi
-- [Uvicorn](https://www.uvicorn.org/) - ASGI sunucusu
-- [Gunicorn](https://gunicorn.org/) - WSGI sunucusu (production için)
-- [Pydantic](https://pydantic-docs.helpmanual.io/) - Veri doğrulama kütüphanesi
-
-## 🤝 Katkıda Bulunma
-
-Katkılarınızı bekliyoruz! Lütfen şu adımları izleyin:
-
-1. Projeyi fork'layın
-2. Feature branch oluşturun (`git checkout -b feature/AmazingFeature`)
-3. Değişikliklerinizi commit edin (`git commit -m 'Add some AmazingFeature'`)
-4. Branch'inizi push edin (`git push origin feature/AmazingFeature`)
-5. Pull Request açın
-
-## 📞 İletişim
-
-- **Email:** support@example.com
-- **GitHub:** https://github.com/example/sb-scrapper/issues
 
 ---
 
-**SB-Scraper v2.0.0** - SeleniumBase tabanlı gelişmiş web scraping API'si
+## 🔒 Güvenlik
+
+### API Key Authentication
+
+API key doğrulamayı etkinleştirmek için:
+
+```bash
+# .env dosyasında
+AUTH_ENABLED=true
+AUTH_API_KEY=your_secret_api_key_here
+```
+
+Request gönderirken header ekleyin:
+
+```bash
+curl -X POST "http://localhost:8000/scrape" \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your_secret_api_key_here" \
+  -d '{"url": "https://example.com"}'
+```
+
+### Rate Limiting
+
+Rate limiting'i etkinleştirmek için:
+
+```bash
+# .env dosyasında
+RATE_LIMITING_ENABLED=true
+RATE_LIMIT_REQUESTS=100
+RATE_LIMIT_PERIOD=60
+```
+
+### CORS
+
+CORS'u etkinleştirmek için:
+
+```bash
+# .env dosyasında
+CORS_ENABLED=true
+CORS_ORIGINS=["https://example.com"]
+CORS_METHODS=["GET","POST"]
+CORS_HEADERS=["*"]
+```
+
+### Sensitive Header Filtering
+
+Hassas header'lar otomatik olarak filtrelenir:
+
+```python
+SENSITIVE_HEADERS=authorization,cookie,x-api-key,token,x-auth-token
+```
+
+---
+
+### Kod Standartları
+
+- **PEP 8**: Python kod standartlarına uyun
+- **Type Hints**: Fonksiyonlarda type hints kullanın
+- **Docstrings**: Fonksiyon ve sınıflar için docstring ekleyin
+- **Comments**: Karmaşık kodları açıklayın
+
+---
+
+## 📄 Lisans
+
+Bu proje MIT lisansı altında lisanslanmıştır. Detaylar için [`LICENSE`](LICENSE) dosyasına bakın.
+
+---
+
+## 🙏 Teşekkürler
+
+- **SeleniumBase**: Mükemmel scraping kütüphanesi için
+- **FastAPI**: Modern ve hızlı web framework için
+- **PostgreSQL**: Güçlü veritabanı için
+- **Loguru**: Güzel logging kütüphanesi için
+
+---
+
+<div align="center">
+
+**⭐ Eğer bu projeyi beğendiyseniz, lütfen yıldız vermeyi unutmayın!**
+
+</div>

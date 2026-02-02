@@ -3,6 +3,8 @@ Black-List Yönetimi
 Domain'leri filtrelemek için kullanılır
 """
 from urllib.parse import urlparse
+from typing import Set
+from app.config import settings
 
 
 class BlacklistManager:
@@ -10,14 +12,14 @@ class BlacklistManager:
     Black-list dosyasını yönetir ve domain kontrolü yapar
     """
 
-    def __init__(self, file_path: str):
+    def __init__(self, file_path: str) -> None:
         """
         Black-list dosyasını yükler
 
         Args:
             file_path: Black-list dosya yolu
         """
-        self.blacklist = set()
+        self.blacklist: Set[str] = set()
         self._load_blacklist(file_path)
 
     def _load_blacklist(self, file_path: str) -> None:
@@ -85,11 +87,13 @@ class BlacklistManager:
             return True
         
         # Subdomain kontrolü - parent domain'leri kontrol et
+        # En az 2 parça olmalı (örn. example.com)
         parts = domain.split('.')
-        for i in range(1, len(parts)):  # İlk parçadan başla (subdomain'i atla)
-            parent_domain = '.'.join(parts[i:])
-            if parent_domain in self.blacklist:
-                return True
+        if len(parts) >= 2:
+            for i in range(1, len(parts)):  # İlk parçadan başla (subdomain'i atla)
+                parent_domain = '.'.join(parts[i:])
+                if parent_domain in self.blacklist:
+                    return True
         
         return False
 
@@ -101,3 +105,7 @@ class BlacklistManager:
             Domain sayısı
         """
         return len(self.blacklist)
+
+
+# Global blacklist manager instance
+blacklist_manager = BlacklistManager(file_path=settings.blacklist_file)
