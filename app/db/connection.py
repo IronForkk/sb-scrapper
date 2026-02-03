@@ -69,8 +69,10 @@ class StrictConnectionPool:
                         f"PostgreSQL bağlantı hatası (strict mode): {e}. "
                         f"Uygulama verisi kaybını önlemek için başlatılmıyor."
                     )
-                print(f"⚠️ PostgreSQL bağlantı denemesi {attempt + 1}/{settings.postgres_max_retries} başarısız...")
-                await asyncio.sleep(5)
+                # Exponential backoff with max 30s: 3s, 6s, 12s, 24s, 30s, 30s...
+                retry_delay = min(3 * (2 ** attempt), 30)
+                print(f"⚠️ PostgreSQL bağlantı denemesi {attempt + 1}/{settings.postgres_max_retries} başarısız... {retry_delay}s bekleniyor.")
+                await asyncio.sleep(retry_delay)
     
     async def get_pool(self):
         """Pool'u döndür"""

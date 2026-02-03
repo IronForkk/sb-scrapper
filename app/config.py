@@ -48,7 +48,7 @@ class Settings(BaseSettings):
     # Connection Pool Ayarları
     postgres_pool_size: int = Field(default=10, alias="POSTGRES_POOL_SIZE")
     postgres_max_overflow: int = Field(default=20, alias="POSTGRES_MAX_OVERFLOW")
-    postgres_max_retries: int = Field(default=5, alias="POSTGRES_MAX_RETRIES")
+    postgres_max_retries: int = Field(default=10, alias="POSTGRES_MAX_RETRIES")
     
     # Retention Policy Ayarları (gün cinsinden)
     log_retention_days: int = Field(default=30, alias="LOG_RETENTION_DAYS")

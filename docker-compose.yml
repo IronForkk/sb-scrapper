@@ -12,11 +12,11 @@ services:
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U sb_user -d sb_scrapper"]
+      test: ["CMD-SHELL", "pg_isready -U sb_user -d sb_scrapper && psql -U sb_user -d sb_scrapper -c 'SELECT 1' > /dev/null 2>&1"]
       interval: 10s
       timeout: 5s
-      retries: 5
-      start_period: 10s
+      retries: 10
+      start_period: 30s
     restart: unless-stopped
 
   sb-scraper:
@@ -53,7 +53,7 @@ services:
       # Connection Pool
       - POSTGRES_POOL_SIZE=${POSTGRES_POOL_SIZE:-10}
       - POSTGRES_MAX_OVERFLOW=${POSTGRES_MAX_OVERFLOW:-20}
-      - POSTGRES_MAX_RETRIES=${POSTGRES_MAX_RETRIES:-5}
+      - POSTGRES_MAX_RETRIES=${POSTGRES_MAX_RETRIES:-10}
       
       # Retention Policy
       - LOG_RETENTION_DAYS=${LOG_RETENTION_DAYS:-30}
