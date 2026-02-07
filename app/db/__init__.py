@@ -1,6 +1,6 @@
 """
 PostgreSQL Veritabanı Modülü
 """
-from app.db.connection import connection_pool
+from app.db.connection import postgres_connection
 
-__all__ = ["connection_pool"]
+__all__ = ["postgres_connection"]

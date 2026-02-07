@@ -2,7 +2,6 @@
 Konfigürasyon Modülü
 Settings ve validators içerir
 """
-# Re-export settings
 from app.config.settings import settings
 
 __all__ = ["settings"]

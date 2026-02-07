@@ -1,0 +1,17 @@
+"""
+Error Code Tanımları
+"""
+class ErrorCode:
+    """Error code sabitleri"""
+    # Tarayıcı Hataları
+    BROWSER_BUSY = "BROWSER_BUSY"
+    BROWSER_INIT_FAILED = "BROWSER_INIT_FAILED"
+    BROWSER_CRASHED = "BROWSER_CRASHED"
+    
+    # PostgreSQL Hataları
+    POSTGRES_CONNECTION_FAILED = "POSTGRES_CONNECTION_FAILED"
+    POSTGRES_QUERY_FAILED = "POSTGRES_QUERY_FAILED"
+    
+    # Validasyon Hataları
+    INVALID_URL = "INVALID_URL"
+    BLACKLISTED_DOMAIN = "BLACKLISTED_DOMAIN"

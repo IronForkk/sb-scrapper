@@ -7,18 +7,17 @@ ENV PYTHONUNBUFFERED=1
 ENV PYTHONIOENCODING=UTF-8
 
 # Locale Configuration (Türkçe Ayarları)
-RUN apt-get update && apt-get install -y --no-install-recommends tzdata locales htop procps && \
+RUN apt-get update && apt-get install -y --no-install-recommends tzdata locales && \
     sed -i '/tr_TR.UTF-8/s/^# //g' /etc/locale.gen && locale-gen && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 ENV TZ=Turkey/Istanbul
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 ENV LANG=tr_TR.UTF-8 LANGUAGE=tr_TR:en LC_ALL=tr_TR.UTF-8
 
-# Install Common Fonts
+# Install Common Fonts (Chrome için gerekli)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    fonts-liberation fonts-liberation2 fonts-font-awesome \
-    fonts-ubuntu fonts-terminus fonts-powerline fonts-open-sans \
-    fonts-mononoki fonts-roboto fonts-lato && \
+    fonts-liberation fonts-liberation2 fonts-noto-cjk \
+    fonts-ipafont-gothic fonts-wqy-zenhei fonts-thai-tlwg fonts-kacst && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install Linux Dependencies
@@ -31,7 +30,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install Utilities & Bash Tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    xdg-utils ca-certificates curl sudo unzip wget xvfb && \
+    xdg-utils ca-certificates curl wget xvfb && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install Chrome
@@ -84,25 +83,18 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Proje dosyalarını kopyala
 COPY app ./app
 
-# Static dosyalarını kopyala
-COPY static ./static
+# Gunicorn konfigürasyon dosyasını kopyala
+COPY gunicorn_config.py .
 
 # Black-list dosyasını kopyala
 COPY black-list.lst .
 
-# Log dizinini oluştur
-RUN mkdir -p /app/logs
-
 # API Portunu dışarı aç
 EXPOSE 8000
 
-# Environment variables
-ENV HEADLESS=true
-ENV WAIT_TIME=8
-ENV LOG_LEVEL=INFO
-
 # Konteyner başladığında API'yi çalıştır
-CMD ["gunicorn", "app.main:app", "-w", "1", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000", "--max-requests", "1000", "--max-requests-jitter", "50", "--timeout", "300", "--graceful-timeout", "240"]
+# Gunicorn config dosyası ile çalıştır
+CMD ["gunicorn", "-c", "gunicorn_config.py", "app.main:app"]
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1

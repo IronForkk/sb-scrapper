@@ -107,5 +107,5 @@ class BlacklistManager:
         return len(self.blacklist)
 
 
-# Global blacklist manager instance
-blacklist_manager = BlacklistManager(file_path=settings.blacklist_file)
+# Global blacklist manager instance (singleton)
+blacklist_manager = BlacklistManager(settings.blacklist_file)

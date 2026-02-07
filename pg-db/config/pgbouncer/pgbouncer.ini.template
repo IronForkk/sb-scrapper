@@ -1,0 +1,53 @@
+[databases]
+# Bu bölüm, hangi veritabanlarının havuzlanacağını tanımlar.
+# Sol taraf (takma ad), uygulamanızın bağlanacağı veritabanı adıdır.
+# Sağ taraf, PgBouncer'ın hangi gerçek veritabanına bağlanacağını belirtir.
+${POSTGRES_DB} = host=postgres port=5432 user=${POSTGRES_USER} password=${POSTGRES_PASSWORD}
+
+[pgbouncer]
+# Tüm ağ arayüzlerinden gelen bağlantıları dinle.
+listen_addr = *
+# Uygulamaların bağlanacağı port.
+listen_port = 6432
+
+# Kimlik doğrulama ayarları
+# plain: Plain text şifre doğrulama (userlist.txt'de plain text şifre kullanıldığında)
+# scram-sha-256: Güvenli parola doğrulama yöntemi (hash formatında şifre kullanıldığında)
+auth_type = plain
+# Kullanıcı ve şifrelerin tutulduğu dosyanın yolu.
+auth_file = /etc/pgbouncer/userlist.txt
+
+# Log ve proses ID dosyalarının yolları
+pidfile = /var/run/pgbouncer/pgbouncer.pid
+logfile = /var/log/pgbouncer/pgbouncer.log
+
+# Performans ve Bağlantı Havuzu Ayarları
+# transaction: Her bir işlem (transaction) sonrası sunucu bağlantısını havuza geri bırakır.
+# Kısa süreli ve sık yapılan bağlantılar için en yüksek performansı sunar.
+# <<< DEĞİŞTİRİLDİ: 'session' modu yerine 'transaction' modu seçildi. Bu en kritik performans iyileştirmesidir.
+pool_mode = transaction
+
+# PgBouncer'a izin verilen maksimum istemci bağlantısı sayısı. Yüksek tutulabilir.
+# <<< DEĞİŞTİRİLDİ: Daha fazla anlık uygulama bağlantısına izin vermek için artırıldı.
+max_client_conn = 400
+# Her veritabanı/kullanıcı çifti için havuzda tutulacak varsayılan sunucu bağlantısı sayısı.
+# Bu değer, PostgreSQL'deki max_connections'a yakın olmamalıdır.
+# <<< DEĞİŞTİRİLDİ: İyi bir başlangıç noktası olarak ayarlandı.
+default_pool_size = 34
+# Havuzdaki bağlantı sayısının bu değere düşmesine izin verir. Kaynakları serbest bırakır.
+# <<< EKLENDİ: Boşta kalan sunucu bağlantılarının bir süre sonra havuza geri verilmesini sağlar.
+min_pool_size = 5
+# Bir istemcinin havuzdan bağlantı almak için bekleyeceği maksimum süre.
+# <<< EKLENDİ: Bağlantı kalmadığında uygulamanın sonsuza kadar beklemesini önler (örn: 2 saniye).
+query_wait_timeout = 2
+
+# Yönetici kullanıcılar (stats, show, reload gibi komutları çalıştırabilir)
+admin_users = ${POSTGRES_USER}
+
+# 'pgbouncer' sanal veritabanına bağlanıp istatistikleri (SHOW STATS vb.)
+# okuma izni olan kullanıcılar. Bu, izleme sisteminin çalışması için kritiktir.
+stats_users = ${POSTGRES_USER}
+
+# İstemciden gelen ve desteklenmeyen/sorun çıkaran başlangıç parametrelerini
+# görmezden gel. Bu ayar modern istemcilerle uyumluluk için önemlidir.
+ignore_startup_parameters = extra_float_digits

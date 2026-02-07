@@ -2,7 +2,6 @@
 Pydantic Şemaları Modülü
 Request ve Response şemaları içerir
 """
-# Re-export schemas
 from app.schemas.request import ScrapeRequest
 from app.schemas.response import ScrapeResponse
 
