@@ -309,18 +309,6 @@ sb-scrapper/
 
 ## 📜 Geliştirme Kuralları
 
-### Yasaklı Özellikler
-- ❌ **async/await:** Tüm işlemler senkron olmalı
-- ❌ **threading:** Paralel çalışma YASAK
-- ❌ **multiprocessing:** Paralel çalışma YASAK
-- ❌ **Queue/Task System:** Sıralı çalışma zorunlu
-- ❌ **Rate Limiting:** Intranet uygulaması
-- ❌ **Authentication:** Intranet uygulaması
-- ❌ **CORS:** Intranet uygulaması
-- ❌ **Response Body Loglama:** Güvenlik
-- ❌ **SQLAlchemy:** Doğrudan SQL kullanılmalı
-- ❌ **Migration Sistemi:** Tek init.sql dosyası
-
 ### İzin Verilen Paketler
 | Paket | Kullanım Alanı |
 |-------|---------------|
@@ -332,26 +320,6 @@ sb-scrapper/
 | `pydantic-settings` | Config |
 | `requests` | HTTP (senkron) |
 | `httpx` | HTTP (senkron mod) |
-
-### Dokunulmaması Gereken Dosyalar
-- `app/payloads/noise_js.py` - Canvas noise JavaScript
-- `app/payloads/sentinel_js.py` - Sentinel JavaScript
-- `db/init.sql` - Veritabanı şeması (sadece gerekirse güncelle)
-
-### Kod İnceleme Checklist'i
-- [ ] Async/await kullanılmadı
-- [ ] Threading kullanılmadı
-- [ ] Multiprocessing kullanılmadı
-- [ ] Queue/task system kullanılmadı
-- [ ] Rate limiting eklenmedi
-- [ ] Authentication eklenmedi
-- [ ] CORS eklenmedi
-- [ ] Response body loglanmadı
-- [ ] Tüm loglar PostgreSQL'e yazılıyor
-- [ ] Tüm ayarlar .env'den okunuyor
-- [ ] Anti-bot detection kodlarına dokunulmadı
-- [ ] Tek endpoint (/scrape) korunuyor
-- [ ] Senkron çalışma sağlanmış
 
 ## 🔒 Güvenlik
 
@@ -412,21 +380,5 @@ curl -X POST "http://localhost:8000/scrape" \
 ## 📄 Lisans
 
 Bu proje [LICENSE](LICENSE) dosyasında belirtilen lisans altında lisanslanmıştır.
-
-## 🤝 Katkıda Bulunma
-
-1. Fork yapın
-2. Feature branch oluşturun (`git checkout -b feature/amazing-feature`)
-3. Değişikliklerinizi commit edin (`git commit -m 'Add amazing feature'`)
-4. Branch'inizi push edin (`git push origin feature/amazing-feature`)
-5. Pull Request açın
-
-**Not:** Kod değişiklikleri yapmadan önce `.clinerules` dosyasını okuyun.
-
-## 📞 İletişim
-
-Sorularınız için issue açabilirsiniz.
-
----
 
 **SB-Scrapper v3.0.0** - SeleniumBase tabanlı web scraping API'si
